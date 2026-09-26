@@ -14,14 +14,14 @@ import Term from '../../components/Term.astro';
 
 There's a running joke that every task, no matter its actual size, gets estimated at "two weeks." The joke is funny because it's close enough to true to sting. But the punchline isn't that engineers are bad at their jobs; it's that the estimate is being asked to do something it structurally can't do: predict the size of a problem you haven't solved yet.
 
-Here's the asymmetry that breaks the whole exercise. Think back to [[the-three-day-bug|that three-day bug with the one-line fix]]. Before you find a bug, you don't know if it's a five-minute typo or a three-day hunt through a race condition, and you don't know because *knowing* would require having already solved it. Estimating a task and doing the task both require understanding the task, and you only get that understanding by doing the work.
+Here's the asymmetry that breaks the whole exercise. Think about a three-day bug with a one-line fix. Before you find a bug, you don't know if it's a five-minute typo or a three-day hunt through a race condition, and you don't know because *knowing* would require having already solved it. Estimating a task and doing the task both require understanding the task, and you only get that understanding by doing the work.
 
 ## Where the time actually goes
 
 Ask an engineer to build a login page and they'll picture: a form, a database check, a success message. That's the part that's easy to estimate, and it's usually a small fraction of the actual work. The rest tends to be things nobody puts a number on because nobody thinks to ask about them upfront:
 
 - What happens when the password is wrong three times in a row?
-- What happens if the database is slow, or briefly unreachable (the same networking gap covered in [[what-the-cloud-actually-is|what "the cloud" is actually made of]])?
+- What happens if the database is slow, or briefly unreachable?
 - Does this need to work for someone using a screen reader?
 - What happens to a user who was logged in when their account got deleted mid-session?
 
