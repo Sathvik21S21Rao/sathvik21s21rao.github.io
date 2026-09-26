@@ -1,0 +1,230 @@
+---
+// KaTeX's stylesheet, scoped to the pages that render prose rather than the
+// whole site. It is what turns rehype-katex's markup into actual maths.
+import 'katex/dist/katex.min.css';
+
+// Long-form article typography. Wraps markdown/MDX output from <Content /> and
+// owns all styling for it via :global(), since slotted content isn't in this
+// component's own scope.
+---
+
+<div class="prose">
+  <slot />
+</div>
+
+<style>
+  .prose {
+    font-family: var(--font-body);
+    font-size: var(--step-0);
+    line-height: 1.7;
+    max-width: var(--measure);
+  }
+
+  .prose :global(p) {
+    margin-block: var(--space-m);
+  }
+
+  .prose :global(h2, h3, h4, h5, h6) {
+    position: relative;
+    font-family: var(--font-display);
+    line-height: 1.2;
+    margin-top: var(--space-xl);
+    margin-bottom: var(--space-xs);
+    scroll-margin-top: var(--space-l);
+  }
+
+  .prose :global(h2) {
+    font-size: var(--step-2);
+  }
+
+  .prose :global(h3) {
+    font-size: var(--step-1);
+  }
+
+  .prose :global(h4, h5, h6) {
+    font-size: var(--step-0);
+  }
+
+  .prose :global(.heading-anchor) {
+    position: absolute;
+    left: -1.1em;
+    top: 0.1em;
+    color: var(--accent-ink);
+    opacity: 0;
+    font-size: 0.75em;
+    background-image: none;
+    transition: opacity var(--dur-fast) var(--ease-out);
+  }
+
+  .prose :global(h2:hover .heading-anchor),
+  .prose :global(h3:hover .heading-anchor),
+  .prose :global(h4:hover .heading-anchor),
+  .prose :global(.heading-anchor:focus-visible) {
+    opacity: 1;
+  }
+
+  .prose :global(a) {
+    color: var(--accent-ink);
+  }
+
+  .prose :global(strong) {
+    font-weight: 600;
+  }
+
+  .prose :global(blockquote) {
+    margin-block: var(--space-l);
+    margin-inline-start: calc(var(--space-m) * -1);
+    padding-inline-start: var(--space-m);
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .prose :global(blockquote p) {
+    margin-block: var(--space-2xs);
+  }
+
+  .prose :global(code) {
+    background: var(--canvas-raised);
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    padding: 0.15em 0.4em;
+    border-radius: var(--radius);
+  }
+
+  .prose :global(pre) {
+    background: var(--canvas-raised);
+    padding: var(--space-m);
+    border-radius: var(--radius);
+    overflow-x: auto;
+    margin-block: var(--space-l);
+    line-height: 1.5;
+  }
+
+  .prose :global(pre code) {
+    background: transparent;
+    padding: 0;
+    font-size: 0.9em;
+    border-radius: 0;
+  }
+
+  .prose :global(img) {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+    margin-block: var(--space-l);
+  }
+
+  /* A long equation scrolls in its own box rather than pushing the column
+     wide; KaTeX ships no overflow of its own. */
+  .prose :global(.katex-display) {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-block: 2px;
+  }
+
+  .prose :global(figure) {
+    margin: var(--space-l) 0;
+  }
+
+  /* Inline SVG diagrams keep a floor width and scroll inside themselves on
+     phones, same as .table-wrap - scaled to fit a 360px screen their labels
+     would drop to about 7px. */
+  .prose :global(.figure-diagram) {
+    overflow-x: auto;
+  }
+
+  .prose :global(.figure-diagram svg) {
+    display: block;
+    width: 100%;
+    min-width: 540px;
+    height: auto;
+  }
+
+  .prose :global(figcaption) {
+    color: var(--muted);
+    font-size: var(--step--1);
+    margin-top: var(--space-2xs);
+    text-align: center;
+  }
+
+  .prose :global(hr) {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin-block: var(--space-xl);
+  }
+
+  .prose :global(ul),
+  .prose :global(ol) {
+    margin-block: var(--space-m);
+    padding-inline-start: 1.5em;
+  }
+
+  .prose :global(li) {
+    margin-block: var(--space-3xs);
+  }
+
+  .prose :global(li)::marker {
+    color: var(--muted);
+  }
+
+  .prose :global(.table-wrap) {
+    overflow-x: auto;
+    margin-block: var(--space-l);
+  }
+
+  .prose :global(table) {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: var(--step--1);
+  }
+
+  .prose :global(th),
+  .prose :global(td) {
+    border-bottom: 1px solid var(--rule);
+    padding: var(--space-2xs) var(--space-s);
+    text-align: left;
+  }
+
+  .prose :global(th) {
+    font-family: var(--font-display);
+    color: var(--muted);
+  }
+
+  /* Shiki dual-theme: light colours come inline from shiki by default;
+     override with the --shiki-dark custom properties in dark mode. */
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light']) .astro-code),
+    :global(:root:not([data-theme='light']) .astro-code span) {
+      color: var(--shiki-dark) !important;
+      background-color: var(--shiki-dark-bg) !important;
+      font-style: var(--shiki-dark-font-style) !important;
+      font-weight: var(--shiki-dark-font-weight) !important;
+      text-decoration: var(--shiki-dark-text-decoration) !important;
+    }
+  }
+
+  :global(:root[data-theme='dark'] .astro-code),
+  :global(:root[data-theme='dark'] .astro-code span) {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+</style>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    var headings = document.querySelectorAll('.prose h2[id], .prose h3[id], .prose h4[id], .prose h5[id], .prose h6[id]');
+    headings.forEach(function (h) {
+      if (h.querySelector('.heading-anchor')) return;
+      var a = document.createElement('a');
+      a.href = '#' + h.id;
+      a.className = 'heading-anchor';
+      a.setAttribute('aria-label', 'Link to this section');
+      a.textContent = '#';
+      h.prepend(a);
+    });
+  })();
+</script>

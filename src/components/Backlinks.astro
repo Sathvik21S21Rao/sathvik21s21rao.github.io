@@ -1,0 +1,81 @@
+---
+interface Props {
+  links: { slug: string; title: string }[];
+  heading?: string;
+}
+
+const { links, heading = 'Mentioned in' } = Astro.props;
+---
+
+{links.length > 0 && (
+  <nav class="backlinks" aria-label={heading}>
+    <h2>{heading}</h2>
+    <ul>
+      {links.map((link) => (
+        <li><a href={`/blog/${link.slug}/`}>{link.title}</a></li>
+      ))}
+    </ul>
+  </nav>
+)}
+
+<style is:global>
+  /* Wikilinks (from remarkWikiLinks) get a distinct treatment so readers can
+     feel an internal jump vs. a normal external/reference link. */
+  a.wikilink {
+    background-image: none;
+    border-bottom: 1px dashed var(--accent);
+  }
+
+  a.wikilink:hover,
+  a.wikilink:focus-visible {
+    background-image: none;
+    background-color: var(--accent-soft);
+  }
+
+  /* Side-track wikilinks: a side track *is* a wiki-link, so it keeps the
+     same dashed/accent underline as any other. A superscript dagger marks
+     it instead — this design's "well-set book" marginalia metaphor treats
+     a side track as a footnote that grew into its own page. Generated
+     here, not baked into the link text in wikilinks.ts, so it can't double
+     up in the accessible name and never leaks into the RSS/plain-text
+     body. Reduced font-size keeps the raised glyph from opening up the
+     line box in serif body copy. The aria-label in wikilinks.ts still
+     carries the distinction non-visually. */
+  a.wikilink.wikilink--sidetrack::after {
+    content: '\2020';
+    font-size: 0.65em;
+    vertical-align: super;
+    margin-left: 0.15em;
+    color: var(--accent-ink);
+  }
+</style>
+
+<style>
+  /* No width/sticky here: this only ever renders nested inside
+     .margin-rail (MarginRail.astro), which is already the --rail-wide
+     sticky column in PostLayout.astro. Re-applying either here nested a
+     sticky element inside a sticky one and doubled the width constraint. */
+
+  /* No font-size/color/letter-spacing here: .margin-rail already sets
+     small-caps, size, colour and tracking for the whole aside, and this
+     heading should inherit them so it reads at the same weight as the
+     <dt> labels in the meta list above it. Only font-weight distinguishes
+     it, same as those <dt>s. */
+  h2 {
+    font-weight: 600;
+    margin-bottom: var(--space-2xs);
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2xs);
+  }
+
+  li a {
+    display: block;
+    font-size: var(--step--1);
+    overflow-wrap: break-word;
+  }
+</style>

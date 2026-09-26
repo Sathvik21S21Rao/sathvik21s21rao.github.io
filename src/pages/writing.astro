@@ -1,0 +1,32 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PostIndex from '../components/PostIndex.astro';
+import { site } from '../config';
+
+// Side tracks (entries with a `parent`) never appear in the main index —
+// that's the whole point of the feature. They still get their own page.
+const allPosts = await getCollection('blog', (entry) =>
+  (import.meta.env.PROD ? !entry.data.draft : true) && !entry.data.parent
+);
+const posts = allPosts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+---
+
+<BaseLayout title={site.name} description={site.description}>
+  <header class="masthead">
+    <h1>{site.description}</h1>
+  </header>
+
+  <PostIndex posts={posts} groupByYear />
+</BaseLayout>
+
+<style>
+  .masthead {
+    padding-block: var(--space-xl) var(--space-l);
+    max-width: var(--measure);
+  }
+
+  .masthead h1 {
+    font-size: var(--step-4);
+  }
+</style>

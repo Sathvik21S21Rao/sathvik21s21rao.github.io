@@ -1,0 +1,132 @@
+@import './tokens.css';
+
+/* Reset / normalize */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+#root, #__next {
+  isolation: isolate;
+}
+
+/* Base typography */
+html {
+  font-size: 100%;
+  /* 100vw on full-bleed sections resolves against window.innerWidth, which
+     includes the classic scrollbar; clip (not hidden, which would break
+     `position: sticky` in descendants) prevents the resulting overhang from
+     producing a horizontal scrollbar. */
+  overflow-x: clip;
+}
+
+body {
+  /* Chrome computes document.documentElement.scrollWidth for the root via a
+     viewport-scrolling-area formula that ignores the root's own overflow-x
+     (verified via CDP: html { overflow-x: clip } alone leaves scrollWidth
+     unchanged). body's overflow-x is what actually stops a full-bleed
+     descendant's layout overflow from reaching that measurement, so it needs
+     the same clip as html to fully close the scrollbar gap. */
+  overflow-x: clip;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.7;
+  font-feature-settings: 'kern' 1, 'liga' 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--ink);
+  line-height: 1.15;
+  font-weight: 400;
+}
+
+/* Every h1 on this site renders at --step-3 or --step-4, so one value covers
+   them all. h2..h6 are tracked at their call sites, where the size is known -
+   a global h2 rule here would beat .margin-rail's inherited small-caps
+   letter-spacing and tighten labels that are meant to be loose. */
+h1 {
+  letter-spacing: var(--tracking-4);
+}
+
+code, pre, kbd, samp {
+  font-family: var(--font-mono);
+}
+
+/* Young Serif ships no italic cut - anything emphasised inside display type,
+   or any italic that resolves against the display stack, falls back to the
+   body serif (which has a real italic) instead of a browser-faked oblique. */
+em, i, cite {
+  font-family: var(--font-body);
+  font-style: italic;
+}
+
+/* Selection */
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+/* Focus-visible rings - --accent-ink, not --accent: the literal amber only
+   clears ~2.8:1 on the light canvas, short of the 3:1 UI-contrast minimum. */
+:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+/* Links */
+a {
+  color: inherit;
+  text-decoration: none;
+  background-image: linear-gradient(var(--accent), var(--accent));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1px;
+  transition: background-size var(--dur-fast) var(--ease-out);
+}
+
+a:hover,
+a:focus-visible {
+  background-size: 100% 1px;
+}
+
+/* Container */
+.wrap {
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 5vw, 3rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

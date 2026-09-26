@@ -1,0 +1,96 @@
+---
+title: "World Models, but the World Is a Graph"
+date: 2026-09-20
+blurb: "Your brain runs simulations before it acts. That is all a world model is and most of the systems worth simulating are things connected to other things, which is what a graph is for."
+tags: ["world-models", "graphs", "machine-learning", "agents"]
+draft: false
+---
+
+import Term from '../../components/Term.astro';
+import HoverGif from '../../components/HoverGif.astro';
+import GridSim from '../../components/GridSim.astro';
+import WorldModelLoop from '../../assets/blog/graph-world-models/world-model-loop.svg';
+import PlanScoring from '../../assets/blog/graph-world-models/plan-scoring.svg';
+
+Our tiny human brains have built a model of the world. Or Stephen Covey would like to call it a "map" of the world. They run little simulations: what happens if I do this, what happens if I do that, then pick whichever one ends best and act on it. You have never touched a kettle boiling at 100 degrees, and you never will. <HoverGif src="/blog/graph-world-models/bruh.gif" alt="Mike Wazowski's face swapped onto Sully's body, staring blankly, captioned 'BRUH'.">Like bruh</HoverGif>, it is "common sense".
+
+Except "common sense" here is just us simulating the consequences of our actions in our heads, usually without noticing we are doing it. So why not model that in a neural network? That question is where world models come from.
+
+## What is a world model?
+
+Take driving as an example. You "see" the cars around you and the obstacles ahead, and based on what you observe you speed up or slow down, steer left or right.
+
+In that instant your brain did the following:
+
+1. Processed what you saw.
+2. Understood the perception of the world around.
+3. Took a few actions mentally on that observation, and predicted the possible future perceptions of the world around based on those decisions.
+4. Took the best action.
+
+<figure class="figure-diagram">
+  <WorldModelLoop />
+  <figcaption>The four steps as a loop: (1) process what you see, (2) understand it, (3) imagine what each action would lead to, (4) take the best one for real. Redrawn after the diagram in Ha &amp; Schmidhuber's 2018 <em>World Models</em>.</figcaption>
+</figure>
+
+That is what a world model does:
+
+- **Input:** the current state of the world or surroundings, and the action being taken.
+- **Output:** the modified state of the world as a consequence of that action.
+
+It is that simple.
+
+## Application of world models
+
+The best use case for this is simulation. Stick with the car. Testing a self-driving controller by physically driving it around would <HoverGif src="/blog/graph-world-models/empty-wallet.gif" alt="Two hands prising open an empty wallet, finding nothing inside.">break the bank</HoverGif>, and honestly it is not even feasible. So instead: let the controller generate the actions, and let the world model play those actions out in its own idea of the environment. Suddenly you can run far more experiments, safely.
+
+But can the simulation itself be wrong? A world model is a learned guess at the physics, and a car that is safe inside a model which misunderstands the lanes on a road is not a safe car (ain't even safe in GTA). That constrains the whole idea. Where a world model earns its keep is the *first ten thousand* tests: you spend cheap imagined runs throwing out the obviously bad ideas, and save the expensive real ones for the few that survive. Confirming the car is actually safe still happens in reality. How far you can trust the model is something you have to measure.
+
+My favourite use case is very relevant to where agentic AI is heading right now. An agent proposes a plan, a series of tool calls, and today the only way to find out whether that plan was any good is to run it. That is expensive, unless you are a die-hard fan of token maxxing. Tokens burn, files get written, real API calls go out, and if the plan was bad you find out at the end.
+
+A world model lets you ask the question before executing. Give it the current state and the proposed plan, and it predicts where the agent ends up and roughly what it costs to get there. Do that over a handful of candidate plans, throw away the ones that never reach the goal, and execute the cheapest survivor. The agent really executes only once.
+
+I work this through properly in [[graph-world-models-case-study|a side track on ranking agentic plans]], once there is enough graph machinery to describe it.
+
+<figure class="figure-diagram">
+  <PlanScoring />
+  <figcaption>Checking plans before running them. The world model imagines all three, the one that misses the goal is thrown away, and only the cheapest plan that still works is done for real.</figcaption>
+</figure>
+
+The agentic environment simulation source is [Qwen-AgentWorld](https://arxiv.org/abs/2606.24597). In that paper, language world models are trained to generate or simulate the responses of an operating system, the web, MCP servers and so on.
+
+And none of this is specific to cars. Any field that is bottlenecked on running physical experiments gets faster the moment you can run those experiments in a model first.
+
+## Why talk about graph world models then?
+
+With graph world models, we aren't changing the concept of world models. The only thing that's different is how the model should process the input, i.e. a graph.
+
+Graphs are the most fundamental way we have of writing down relationships between things, and most of the real world is things related to other things. So instead of handing the world model an unstructured blob of state, we can hand it the relationships too.
+
+Take a power grid. It has substations and generators joined by physical lines. It's very intuitive to think that the substations/generators are nodes and the connections between them are edges. Now we can represent the state of the nodes as [temperature, voltage, power, etc.]. Now, in case I want to predict the behaviour of the grid on a substation failure, I can just change the state of that failed substation and run that through the world model to predict the state of the grid itself. This is only possible because we are using the fact that the nodes are connected to see how it affects the entire grid as a whole.
+
+<GridSim />
+
+In most cases, we do know how different entities in the world interact. Instead of the model inferring the interactions during training, the input state can itself contain them. So there is nothing fancy about graph world models, it is a world model whose input and output involve graphs.
+
+If you want the notation — the transition function, the two paradigms of fixed and dynamic edges, and where the training objective actually comes from — that lives in [[graph-world-models-technicalities|a side track on the technicalities]]. It is still being written; nothing below needs it.
+
+## Limitations of GWMs
+
+GWMs require the input to be transformed as a graph. But data is most likely not present as a graph. Think of raw data as <HoverGif src="/blog/graph-world-models/crude-oil.jpeg" alt="A bald eagle glaring in front of an American flag, captioned 'Did you say oil?'">crude oil</HoverGif> and the converted graph data as gasoline. Somebody has to structure the data to be represented as a graph. Another issue with graphs is that the edges are quadratic with the number of nodes: for n nodes in a graph there can be on the order of n² edges. This further adds in restrictions and work arounds to think about.
+
+Then there is compounding <Term def="Running a world model forward repeatedly, feeding each predicted state back in as the input to the next prediction.">rollout</Term> error. Each predicted graph is the input to the next prediction, so errors feed forward and grow. A world model that is 95% accurate per step is nowhere near 95% accurate over a twenty-step rollout. That is the hard ceiling on long-horizon agent plans, and it is why an honest deployment keeps horizons short and re-grounds against reality periodically instead of trusting a long imagined trajectory.
+
+The limitations discussed are just according to the structure of <Term def="A model that generates a sequence one step at a time, where each step is conditioned on the steps it already produced.">autoregressive</Term> GWMs. We did not even talk about the limitations of the representational power of the models. We can keep speaking on and on about it, but I got to go.
+
+## Where this leaves us
+
+Strip away the notation and a graph world model is one sentence: a world model whose input and output happen to be graphs. It is worth the trouble because most of the systems we would like to simulate, like grids, molecules, or an agent halfway through a plan, are made of things that interact, and a graph is the data structure that has somewhere to put the interactions.
+
+The part I find most interesting is the agentic one. Right now an agent finds out whether its plan was any good by running it and seeing what breaks. A world model that is even roughly right turns that into a question you can ask cheaply, many times over, before committing to anything. The obstacles are real: error compounds over long rollouts, and the model only knows what its traces taught it. Neither one sinks the idea. They are bounds on how far you can push it before you have to go and check with reality again.
+
+If you want to go deeper, the 2018 world models paper is the right place to start, and the agentic environment simulation work is what got me thinking about this angle in the first place. Both are below.
+
+## References
+
+1. David Ha and Jürgen Schmidhuber. *World Models*. 2018. [arXiv:1803.10122](https://arxiv.org/abs/1803.10122)
+2. Yuxin Zuo, Zikai Xiao, Li Sheng, et al. *Qwen-AgentWorld: Language World Models for General Agents*. 2026. [arXiv:2606.24597](https://arxiv.org/abs/2606.24597)

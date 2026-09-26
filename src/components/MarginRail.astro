@@ -1,0 +1,143 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import TagPill from './TagPill.astro';
+import Backlinks from './Backlinks.astro';
+
+type Post = CollectionEntry<'blog'>;
+
+interface Props {
+  post: Post;
+  readingTime: string;
+  backlinks: { slug: string; title: string }[];
+  sideTracks?: { slug: string; title: string }[];
+  parentLink?: { slug: string; title: string } | null;
+}
+
+const { post, readingTime, backlinks, sideTracks = [], parentLink = null } = Astro.props;
+
+const dateFmt = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+});
+---
+
+<aside class="margin-rail" aria-label="Post details">
+  <div class="margin-rail__mark" aria-hidden="true"></div>
+  <dl class="margin-rail__meta">
+    <div class="margin-rail__item">
+      <dt>Published</dt>
+      <dd>{dateFmt.format(post.data.date)}</dd>
+    </div>
+    {post.data.updated && (
+      <div class="margin-rail__item">
+        <dt>Updated</dt>
+        <dd>{dateFmt.format(post.data.updated)}</dd>
+      </div>
+    )}
+    <div class="margin-rail__item">
+      <dt>Reading time</dt>
+      <dd>{readingTime}</dd>
+    </div>
+    {post.data.tags.length > 0 && (
+      <div class="margin-rail__item">
+        <dt>Tags</dt>
+        <dd class="margin-rail__tags">
+          {post.data.tags.map((tag) => (
+            <TagPill tag={tag} />
+          ))}
+        </dd>
+      </div>
+    )}
+  </dl>
+
+  {backlinks.length > 0 && (
+    <div class="margin-rail__backlinks">
+      <Backlinks links={backlinks} />
+    </div>
+  )}
+
+  {sideTracks.length > 0 && (
+    <div class="margin-rail__backlinks">
+      <Backlinks links={sideTracks} heading="Side tracks" />
+    </div>
+  )}
+
+  {parentLink && (
+    <div class="margin-rail__backlinks">
+      <Backlinks links={[parentLink]} heading="Side track of" />
+    </div>
+  )}
+</aside>
+
+<style>
+  .margin-rail {
+    font-size: var(--step--1);
+    color: var(--muted);
+    font-variant-caps: small-caps;
+    letter-spacing: 0.02em;
+  }
+
+  /* Echoes the amber baseline under the site name in the header's own
+     --rail column: same mark, same column, tying this rail to that one. */
+  .margin-rail__mark {
+    width: 2rem;
+    height: 2px;
+    background: var(--accent);
+    margin-bottom: var(--space-s);
+  }
+
+  .margin-rail__meta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+  }
+
+  .margin-rail__item dt {
+    font-weight: 600;
+  }
+
+  .margin-rail__item dd {
+    margin: 0;
+    margin-top: var(--space-3xs);
+  }
+
+  .margin-rail__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2xs);
+  }
+
+  .margin-rail__backlinks {
+    margin-top: var(--space-l);
+    padding-top: var(--space-m);
+    border-top: 1px solid var(--rule);
+  }
+
+  @media (max-width: 900px) {
+    .margin-rail__mark {
+      display: none;
+    }
+
+    .margin-rail {
+      font-variant-caps: normal;
+    }
+
+    .margin-rail__meta {
+      flex-direction: row;
+      flex-wrap: wrap;
+      column-gap: var(--space-l);
+      row-gap: var(--space-2xs);
+    }
+
+    .margin-rail__item {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-3xs);
+    }
+
+    .margin-rail__item dd {
+      margin-top: 0;
+    }
+  }
+</style>

@@ -1,0 +1,70 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Page not found">
+  <div class="not-found">
+    <div class="not-found__mark" aria-hidden="true">404</div>
+    <div class="not-found__main">
+      <h1>This page wandered off.</h1>
+      <p class="not-found__body">
+        There's nothing here. Maybe it moved, maybe it never existed, maybe you
+        typed it from memory and memory lied. It happens to the best URLs.
+      </p>
+      <p class="not-found__links">
+        <a href="/writing">Back to writing</a> &middot; <a href="/">About</a>
+      </p>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .not-found {
+    display: grid;
+    grid-template-columns: var(--rail) 1fr;
+    column-gap: var(--space-m);
+    align-items: start;
+    padding-block: var(--space-3xl);
+  }
+
+  .not-found__mark {
+    grid-column: 1;
+    font-family: var(--font-display);
+    font-size: var(--step-3);
+    color: var(--muted);
+    line-height: 1;
+  }
+
+  .not-found__main {
+    grid-column: 2;
+    min-width: 0;
+    max-width: var(--measure);
+  }
+
+  .not-found h1 {
+    font-family: var(--font-display);
+    font-size: var(--step-4);
+    line-height: 1.1;
+  }
+
+  .not-found__body {
+    margin-top: var(--space-m);
+    color: var(--muted);
+    font-size: var(--step-1);
+  }
+
+  .not-found__links {
+    margin-top: var(--space-l);
+  }
+
+  @media (max-width: 768px) {
+    .not-found {
+      grid-template-columns: 1fr;
+      row-gap: var(--space-s);
+    }
+
+    .not-found__main {
+      grid-column: 1;
+    }
+  }
+</style>

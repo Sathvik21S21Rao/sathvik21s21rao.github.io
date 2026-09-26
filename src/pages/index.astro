@@ -1,0 +1,188 @@
+---
+import { site } from "../config";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import AboutIntro from "../components/AboutIntro.astro";
+import OfficeScene from "../components/OfficeScene.astro";
+
+const socialLabels: Record<string, string> = {
+  github: "GitHub",
+  email: "Email",
+  linkedin: "LinkedIn",
+  x: "X",
+  bluesky: "Bluesky",
+};
+
+const socials = Object.entries(site.socials).map(([key, value]) => ({
+  key,
+  label: socialLabels[key] ?? key,
+  href: key === "email" ? `mailto:${value}` : value,
+  display: key === "email" ? value : value.replace(/^https?:\/\//, ""),
+}));
+
+// TODO(sathvik): fill in five: a food; a place; a tool or piece of software
+// you'll defend in an argument; a genre, band, or specific album; something
+// completely unrelated to computers.
+const likes: string[] = [];
+---
+
+<BaseLayout title="About" description="A little about who's writing this.">
+  <OfficeScene>
+    <AboutIntro level="h1" />
+  </OfficeScene>
+
+  <div class="about-grid">
+    {/* TODO(sathvik): replace with a real portrait and write real alt text */}
+
+    <article class="about-content">
+      {/* "How I got here" —
+          TODO(sathvik): the honest, slightly winding version, not "I've always loved
+          computers," but the actual turn or accident that got you paying attention.
+
+          "What I'm chewing on" —
+          TODO(sathvik): the current open question, obsession, or half-formed idea,
+          something in progress, not resolved. This is the paragraph that changes most. */}
+
+      {likes.length > 0 && (
+        <section class="section">
+          <h2>Things I like</h2>
+          <ul class="likes">
+            {likes.map((like) => (
+              <li>{like}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section class="section">
+        <h2>Say hello</h2>
+        <p class="contact-lede">
+          Reachable here, in rough order of how likely I am to reply fast:
+        </p>
+        <ul class="contact">
+          {socials.map((s) => (
+            <li>
+              <a
+                href={s.href}
+                rel={s.key === "email" ? undefined : "me noopener noreferrer"}
+              >
+                {s.label} <span class="contact-value">{s.display}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </article>
+  </div>
+</BaseLayout>
+
+<style>
+  .about-grid {
+    display: grid;
+    grid-template-columns: var(--rail) minmax(0, 1fr);
+    gap: var(--space-xl);
+    align-items: start;
+    padding-block: var(--space-xl) var(--space-3xl);
+  }
+
+  .portrait {
+    grid-column: 1;
+    position: sticky;
+    top: var(--space-l);
+  }
+
+  .portrait img {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+  }
+
+  .about-content {
+    grid-column: 2;
+    max-width: var(--measure);
+    min-width: 0;
+  }
+
+  /* .portrait is gone until a real portrait exists; without this, .about-content
+     stays pinned to column 2 and leaves a hole where the rail used to be. */
+  .about-grid > :only-child {
+    grid-column: 1 / -1;
+  }
+
+  .section {
+    margin-bottom: var(--space-xl);
+  }
+
+  .section h2 {
+    font-size: var(--step-1);
+    margin-bottom: var(--space-s);
+  }
+
+  .section p {
+    line-height: 1.7;
+  }
+
+  .likes {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+  }
+
+  .likes li {
+    padding-left: var(--space-m);
+    position: relative;
+  }
+
+  .likes li::before {
+    content: "-";
+    position: absolute;
+    left: 0;
+    color: var(--accent-ink);
+  }
+
+  .contact-lede {
+    color: var(--muted);
+    margin-bottom: var(--space-s);
+  }
+
+  .contact {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+  }
+
+  .contact a {
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+  }
+
+  .contact-value {
+    color: var(--muted);
+  }
+
+  .contact-value::before {
+    content: " · ";
+  }
+
+  @media (max-width: 768px) {
+    .about-grid {
+      grid-template-columns: 1fr;
+      gap: var(--space-l);
+    }
+
+    .portrait {
+      grid-column: 1;
+      position: static;
+      max-width: 16rem;
+    }
+
+    .about-content {
+      grid-column: 1;
+    }
+  }
+</style>

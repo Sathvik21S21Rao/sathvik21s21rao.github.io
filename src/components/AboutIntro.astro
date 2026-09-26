@@ -1,0 +1,48 @@
+---
+// Shared "about me" opening: the hook line plus the "What I work on" blurb.
+// Used at h1 on / (the About page).
+interface Props {
+  level?: "h1" | "h2";
+}
+
+const { level = "h1" } = Astro.props;
+const Heading = level;
+---
+
+<Heading class="hook">
+  {/* TODO(sathvik): replace with a real opening sentence, a hook, not a resume line. */}
+  I build things, break most of them first, and write down what the breaking
+  taught me.
+</Heading>
+
+{/* TODO(sathvik): "What I work on" — 2-4 sentences on the kind of problems you
+    gravitate toward, specific enough that someone could picture a Tuesday of
+    yours. Not a list of technologies; the shape of the work, not the resume of
+    it. */}
+
+<style>
+  .hook {
+    font-size: var(--step-3);
+    line-height: 1.25;
+    margin-bottom: var(--space-2xl);
+  }
+
+  .section {
+    margin-bottom: var(--space-xl);
+  }
+
+  .section h2 {
+    font-size: var(--step-1);
+    margin-bottom: var(--space-s);
+  }
+
+  .section p {
+    line-height: 1.7;
+  }
+
+  @media (max-width: 768px) {
+    .hook {
+      font-size: var(--step-2);
+    }
+  }
+</style>

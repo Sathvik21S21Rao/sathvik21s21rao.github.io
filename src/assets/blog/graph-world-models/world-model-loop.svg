@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 425" width="720" height="425" role="img" aria-labelledby="wmf-title wmf-desc">
+  <title id="wmf-title">Driving as a world-model loop</title>
+  <desc id="wmf-desc">Redrawn after Ha and Schmidhuber's 2018 world models diagram. The road produces what you see. Step 1: your brain processes it. Step 2: that becomes an understanding of the scene. Step 3: you imagine what happens next, trying actions in your head and feeding them back into the prediction. Step 4: you take the best action for real, which changes the road.</desc>
+  <!-- Colours are the site's tokens, so the figure follows the theme toggle when
+       inlined; the hex fallbacks are the light theme, for opening the file alone.
+       Class names are prefixed: an inline SVG's <style> is page-global. -->
+  <style>
+    .wmf-ln { fill: none; stroke: var(--ink, #16221C); stroke-width: 1.5; }
+    .wmf-dash { stroke-dasharray: 6 5; }
+    .wmf-bx { fill: var(--canvas-raised, #E8EAE1); stroke: var(--ink, #16221C); stroke-width: 1.5; }
+    .wmf-head { fill: var(--ink, #16221C); }
+    .wmf-t { font-family: var(--font-body, Georgia, serif); font-size: 16px; fill: var(--ink, #16221C); }
+    .wmf-s { font-family: var(--font-body, Georgia, serif); font-size: 13px; font-style: italic; fill: var(--muted, #5B655C); }
+    .wmf-wm { fill: none; stroke: var(--accent, #C8801F); stroke-width: 1.5; stroke-dasharray: 2 4; stroke-linecap: round; }
+    .wmf-wml { font-family: var(--font-display, Georgia, serif); font-size: 18px; fill: var(--accent-ink, #8F5A0D); }
+    .wmf-badge { fill: var(--accent, #C8801F); }
+    .wmf-num { font-family: var(--font-body, Georgia, serif); font-size: 12px; font-weight: 700; fill: var(--canvas, #F1F2EC); }
+    .wmf-sky { fill: var(--canvas-raised, #E8EAE1); }
+    .wmf-road { fill: var(--muted, #5B655C); opacity: 0.45; }
+    .wmf-lane { fill: none; stroke: var(--canvas, #F1F2EC); stroke-width: 2; stroke-dasharray: 6 5; }
+    .wmf-car { fill: var(--ink, #16221C); }
+    .wmf-brake { fill: var(--accent, #C8801F); }
+  </style>
+  <defs>
+    <marker id="wmf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="wmf-head" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+    <clipPath id="wmf-view"><rect x="40" y="108" width="130" height="110"/></clipPath>
+  </defs>
+
+  <!-- the road (environment) -->
+  <rect class="wmf-bx" x="280" y="14" width="160" height="44" rx="8"/>
+  <text class="wmf-t" x="360" y="41" text-anchor="middle">the road</text>
+
+  <!-- what you see (observation): windshield view, car ahead braking -->
+  <g clip-path="url(#wmf-view)">
+    <rect class="wmf-sky" x="40" y="108" width="130" height="110"/>
+    <polygon class="wmf-road" points="52,218 158,218 112,150 98,150"/>
+    <line class="wmf-lane" x1="105" y1="216" x2="105" y2="152"/>
+    <rect class="wmf-car" x="95" y="164" width="20" height="12" rx="2"/>
+    <rect class="wmf-brake" x="96" y="170" width="4" height="3"/>
+    <rect class="wmf-brake" x="110" y="170" width="4" height="3"/>
+  </g>
+  <rect x="40" y="108" width="130" height="110" fill="none" stroke="var(--ink, #16221C)" stroke-width="2.5"/>
+  <text class="wmf-t" x="105" y="243" text-anchor="middle">what you see</text>
+  <path class="wmf-ln" d="M280,36 H105 V104" marker-end="url(#wmf-arrow)"/>
+
+  <!-- your world model boundary -->
+  <rect class="wmf-wm" x="222" y="84" width="226" height="300" rx="16"/>
+  <text class="wmf-wml" x="118" y="330" text-anchor="middle">your world model</text>
+
+  <!-- 1: process what you saw -->
+  <path class="wmf-ln" d="M170,175 H272" marker-end="url(#wmf-arrow)"/>
+  <polygon class="wmf-bx" points="250,100 420,100 370,150 420,200 250,200 300,150"/>
+  <text class="wmf-t" x="335" y="128" text-anchor="middle">process</text>
+  <text class="wmf-s" x="335" y="186" text-anchor="middle">what you saw</text>
+
+  <!-- 2: understanding, to imagination and to the decision -->
+  <path class="wmf-ln" d="M335,200 V266" marker-end="url(#wmf-arrow)"/>
+  <path class="wmf-ln" d="M335,235 H541" marker-end="url(#wmf-arrow)"/>
+  <text class="wmf-s" x="490" y="252" text-anchor="middle">understanding</text>
+
+  <!-- 3: imagine what happens next -->
+  <rect class="wmf-bx" x="250" y="270" width="170" height="80" rx="10"/>
+  <text class="wmf-t" x="335" y="304" text-anchor="middle">imagine</text>
+  <text class="wmf-s" x="335" y="326" text-anchor="middle">what happens next</text>
+  <path class="wmf-ln" d="M420,300 H541" marker-end="url(#wmf-arrow)"/>
+  <text class="wmf-s" x="484" y="292" text-anchor="middle">prediction</text>
+
+  <!-- 4: act -->
+  <polygon class="wmf-bx" points="545,205 545,315 615,260"/>
+  <text class="wmf-t" x="570" y="265" text-anchor="middle">act</text>
+
+  <!-- real action goes out to the road; imagined ones loop back into the prediction -->
+  <path class="wmf-ln" d="M615,260 H670 V36 H444" marker-end="url(#wmf-arrow)"/>
+  <text class="wmf-s" x="555" y="28" text-anchor="middle">for real: brake</text>
+  <path class="wmf-ln wmf-dash" d="M670,260 V405 H335 V354" marker-end="url(#wmf-arrow)"/>
+  <text class="wmf-s" x="515" y="397" text-anchor="middle">in your head: brake? swerve? speed up?</text>
+
+  <!-- step badges, drawn last so they sit on top -->
+  <g>
+    <circle class="wmf-badge" cx="250" cy="100" r="10"/><text class="wmf-num" x="250" y="104" text-anchor="middle">1</text>
+    <circle class="wmf-badge" cx="335" cy="217" r="10"/><text class="wmf-num" x="335" y="221" text-anchor="middle">2</text>
+    <circle class="wmf-badge" cx="250" cy="270" r="10"/><text class="wmf-num" x="250" y="274" text-anchor="middle">3</text>
+    <circle class="wmf-badge" cx="545" cy="205" r="10"/><text class="wmf-num" x="545" y="209" text-anchor="middle">4</text>
+  </g>
+</svg>

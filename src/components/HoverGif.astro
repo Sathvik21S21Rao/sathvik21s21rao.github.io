@@ -1,0 +1,149 @@
+---
+// Inline comic GIF that plays when you hover the words it's attached to.
+// Modelled on Term.astro - same CSS-only :hover/:focus popover, same
+// viewport-clipping caveat - with one thing CSS can't do bolted on: a hidden
+// GIF still downloads and loops in the background, so the src is swapped in on
+// first hover instead. A reader who never hovers never pays for the joke, and
+// the animation starts at frame one when it's actually on screen.
+interface Props {
+  src: string;
+  alt: string;
+}
+
+const { src, alt } = Astro.props;
+const id = `gif-${Math.random().toString(36).slice(2, 9)}`;
+// A still image takes the same popover but isn't motion, so the
+// reduced-motion opt-out below doesn't apply to it.
+const still = !/\.gif$/i.test(src);
+---
+
+<span class:list={["gif", { "gif--still": still }]}>
+  <button type="button" class="gif-trigger" aria-describedby={id}>
+    <slot />
+  </button>
+  <span role="tooltip" id={id} class="gif-pop">
+    <img class="gif-img" data-src={src} alt={alt} loading="lazy" decoding="async" />
+  </span>
+</span>
+
+<style>
+  .gif {
+    position: relative;
+    display: inline-block;
+  }
+
+  /* Marker-pen highlight rather than Term's dotted underline: both are inline
+     affordances in the same paragraph, so they have to be told apart at a
+     glance. Dotted = there's a definition. Highlighted = there's a picture. */
+  .gif-trigger {
+    font: inherit;
+    color: inherit;
+    background: var(--accent-soft);
+    border: none;
+    padding: 0 0.15em;
+    margin: 0;
+    border-radius: var(--radius);
+    cursor: zoom-in;
+  }
+
+  .gif-pop {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + var(--space-3xs));
+    /* Grows out of the words it belongs to, not out of its own middle. */
+    transform: translateX(-50%) translateY(3px) scale(0.97);
+    transform-origin: bottom center;
+    /* ponytail: inherits Term's limitation - pure-CSS centering can't flip to
+       stay on-screen, so a trigger within ~1rem of the viewport edge clips.
+       Same upgrade path: CSS anchor-positioning once support is solid. */
+    /* Sized to the GIF, never past it - reaction GIFs are small (often
+       ~220px) and stretching one to a fixed width just blurs it. */
+    width: max-content;
+    max-width: min(22rem, calc(100vw - 2rem));
+    background: var(--canvas-raised);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: var(--space-3xs);
+    box-shadow: var(--shadow-tooltip);
+    line-height: 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    /* visibility is in the list on purpose - see Term.astro for why. */
+    transition: opacity var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out),
+                visibility var(--dur-fast);
+    z-index: 20;
+  }
+
+  .gif-img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: calc(var(--radius) - 1px);
+  }
+
+  .gif-trigger:hover + .gif-pop,
+  .gif-trigger:focus + .gif-pop {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+
+  /* The file isn't there yet, or never arrives. Drop the affordance rather
+     than promise a picture and serve a broken-image icon. */
+  .gif--missing .gif-trigger {
+    background: none;
+    padding: 0;
+    cursor: inherit;
+  }
+
+  .gif--missing .gif-pop {
+    display: none;
+  }
+
+  /* An autoplaying GIF is the exact thing this asks to be spared. These are
+     jokes, not argument, so the honest answer is to not show them at all -
+     no src is ever set, so nothing downloads either. */
+  @media (prefers-reduced-motion: reduce) {
+    .gif:not(.gif--still) .gif-trigger {
+      background: none;
+      padding: 0;
+      cursor: inherit;
+    }
+
+    .gif:not(.gif--still) .gif-pop {
+      display: none;
+    }
+  }
+</style>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // :not([data-gif-ready]) is load-bearing. An is:inline script is emitted
+    // once per component instance, not deduped, so with three GIFs on a page
+    // this IIFE runs three times - and without the marker each one would
+    // attach its own listener, the second of which fires after data-src is
+    // gone and sets src to the string "undefined". A new page after a view
+    // transition brings unmarked elements, so this still initialises them.
+    document.querySelectorAll('.gif:not([data-gif-ready])').forEach(function (wrap) {
+      var img = wrap.querySelector('.gif-img');
+      if (!img || !img.dataset.src) return;
+      if (reduce && !wrap.classList.contains('gif--still')) return;
+      wrap.dataset.gifReady = '';
+
+      var load = function () {
+        img.addEventListener('error', function () {
+          wrap.classList.add('gif--missing');
+        });
+        img.src = img.dataset.src;
+        delete img.dataset.src;
+      };
+
+      wrap.addEventListener('pointerenter', load, { once: true });
+      wrap.addEventListener('focusin', load, { once: true });
+    });
+  })();
+</script>

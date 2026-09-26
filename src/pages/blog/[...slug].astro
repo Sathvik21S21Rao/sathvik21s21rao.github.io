@@ -1,0 +1,42 @@
+---
+import { getCollection, render } from 'astro:content';
+import PostLayout from '../../layouts/PostLayout.astro';
+import Prose from '../../components/Prose.astro';
+import { getRelatedPosts, getSideTracks } from '../../lib/related';
+import { getBacklinks } from '../../lib/wikilinks';
+import { readingTime } from '../../lib/reading-time';
+
+export async function getStaticPaths() {
+  const allPosts = await getCollection('blog', (entry) =>
+    import.meta.env.PROD ? !entry.data.draft : true
+  );
+
+  return allPosts.map((post) => ({
+    params: { slug: post.id },
+    props: { post, allPosts },
+  }));
+}
+
+const { post, allPosts } = Astro.props;
+const { Content } = await render(post);
+
+const related = getRelatedPosts(post, allPosts);
+const backlinks = getBacklinks(post, allPosts);
+const sideTracks = getSideTracks(post.id, allPosts);
+const parentPost = post.data.parent ? allPosts.find((p) => p.id === post.data.parent) : undefined;
+const parentLink = parentPost ? { slug: parentPost.id, title: parentPost.data.title } : null;
+const { text: readingTimeText } = readingTime(post.body ?? '');
+---
+
+<PostLayout
+  post={post}
+  related={related}
+  backlinks={backlinks}
+  sideTracks={sideTracks}
+  parentLink={parentLink}
+  readingTime={readingTimeText}
+>
+  <Prose>
+    <Content />
+  </Prose>
+</PostLayout>

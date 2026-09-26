@@ -1,0 +1,77 @@
+---
+// Accessible inline jargon tooltip. CSS-only (:hover/:focus) rather than the
+// popover API: broader browser support, and this is small enough that a
+// dependency or JS state machine would be overkill.
+interface Props {
+  def: string;
+}
+
+const { def } = Astro.props;
+const id = `term-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<span class="term">
+  <button type="button" class="term-trigger" aria-describedby={id}>
+    <slot />
+  </button>
+  <span role="tooltip" id={id} class="term-tooltip">{def}</span>
+</span>
+
+<style>
+  .term {
+    position: relative;
+    display: inline-block;
+  }
+
+  .term-trigger {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: help;
+    border-bottom: 1px dotted var(--accent);
+  }
+
+  .term-tooltip {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + var(--space-3xs));
+    /* Grows out of the word it defines, not out of its own middle. */
+    transform: translateX(-50%) translateY(3px) scale(0.97);
+    transform-origin: bottom center;
+    width: max-content;
+    /* ponytail: pure-CSS centering can't flip to stay on-screen like JS or
+       CSS anchor-positioning would; if a term ever sits within ~1rem of the
+       viewport edge this clips instead of repositioning. Upgrade path:
+       CSS anchor-positioning (position-try-fallbacks) once support is solid. */
+    max-width: min(18rem, calc(100vw - 2rem));
+    background: var(--canvas-raised);
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: var(--space-2xs) var(--space-xs);
+    font-family: var(--font-body);
+    font-size: var(--step--1);
+    line-height: 1.4;
+    box-shadow: var(--shadow-tooltip);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    /* visibility is in the list on purpose: without it the tooltip fades in
+       and then hard-cuts out. Transitioning it makes the step hold `visible`
+       for the full duration on the way out, so opacity gets its fade. */
+    transition: opacity var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out),
+                visibility var(--dur-fast);
+    z-index: 20;
+  }
+
+  .term-trigger:hover + .term-tooltip,
+  .term-trigger:focus + .term-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+</style>

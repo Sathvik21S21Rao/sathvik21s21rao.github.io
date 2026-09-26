@@ -1,0 +1,50 @@
+---
+import { site } from '../config';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="wrap site-footer__inner">
+    <p class="site-footer__copy">&copy; {year} {site.name}</p>
+    <ul class="site-footer__links">
+      <li><a href={site.socials.github}>GitHub</a></li>
+      <li><a href={`mailto:${site.socials.email}`}>Email</a></li>
+      <li><a href="/rss.xml">RSS</a></li>
+    </ul>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    border-top: 1px solid var(--rule);
+    margin-top: var(--space-3xl);
+  }
+
+  .site-footer__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-s);
+    padding-block: var(--space-m);
+    font-size: var(--step--1);
+    color: var(--muted);
+  }
+
+  .site-footer__links {
+    display: flex;
+    list-style: none;
+    gap: var(--space-m);
+    padding: 0;
+  }
+
+  .site-footer__links a {
+    color: var(--muted);
+  }
+
+  .site-footer__links a:hover,
+  .site-footer__links a:focus-visible {
+    color: var(--ink);
+  }
+</style>

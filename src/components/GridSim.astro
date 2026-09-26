@@ -1,0 +1,530 @@
+---
+// Interactive toy power grid for graph-world-models.mdx. Hover (or focus) a
+// station to read its state; click (or Enter/Space) to fail it and see the
+// predicted knock-on effects. The prediction itself is src/lib/grid.ts, a
+// pure function with its own checks in lib.test.ts - this file only draws.
+//
+// Everything is inline SVG plus one bundled script, no fetches and no asset
+// paths, so it builds to plain static files for GitHub Pages as-is.
+import { SUBSTATIONS } from "../lib/grid";
+
+const POS = {
+  g1: [190, 70],
+  g2: [530, 70],
+  s3: [80, 230],
+  s1: [270, 230],
+  s2: [450, 230],
+  s4: [640, 230],
+} as const;
+
+const NAMES = {
+  g1: "Generator 1",
+  g2: "Generator 2",
+  s1: "Substation 1",
+  s2: "Substation 2",
+  s3: "Substation 3",
+  s4: "Substation 4",
+} as const;
+
+const GEN_R = 32;
+const SUB_W = 84;
+const SUB_H = 50;
+
+const lines = (
+  Object.entries(SUBSTATIONS) as [
+    keyof typeof SUBSTATIONS,
+    (typeof SUBSTATIONS)[keyof typeof SUBSTATIONS],
+  ][]
+).flatMap(([s, sub]) =>
+  sub.gens.map((g) => ({
+    id: `${g}-${s}`,
+    x1: POS[g][0],
+    y1: POS[g][1] + GEN_R,
+    x2: POS[s][0],
+    y2: POS[s][1] - SUB_H / 2,
+  })),
+);
+
+const gens = (["g1", "g2"] as const).map((id) => ({
+  id,
+  x: POS[id][0],
+  y: POS[id][1],
+  label: `Gen ${id[1]}`,
+}));
+const subs = (["s1", "s2", "s3", "s4"] as const).map((id) => ({
+  id,
+  x: POS[id][0],
+  y: POS[id][1],
+  label: `Sub ${id[1]}`,
+}));
+---
+
+<figure
+  class="grid-sim"
+  data-grid-sim
+  data-names={JSON.stringify(NAMES)}
+>
+  <div class="figure-diagram">
+  <svg
+    viewBox="0 0 720 280"
+    width="720"
+    height="280"
+    role="group"
+    aria-label="A power grid: two generators feeding four substations. Substations 1 and 2 connect to both generators, Substation 3 only to Generator 1, Substation 4 only to Generator 2."
+  >
+    {lines.map((l) => (
+      <line
+        class="grid-line"
+        data-line={l.id}
+        x1={l.x1}
+        y1={l.y1}
+        x2={l.x2}
+        y2={l.y2}
+      />
+    ))}
+
+    {gens.map((n) => (
+      <g
+        class="grid-node"
+        data-node={n.id}
+        data-status="ok"
+        tabindex="0"
+        role="button"
+        aria-pressed="false"
+        aria-label={NAMES[n.id]}
+      >
+        <circle class="grid-shape" cx={n.x} cy={n.y} r={GEN_R} />
+        <path
+          class="grid-x"
+          d={`M${n.x - 20},${n.y - 20} L${n.x + 20},${n.y + 20} M${n.x + 20},${n.y - 20} L${n.x - 20},${n.y + 20}`}
+        />
+        <text class="grid-label" x={n.x} y={n.y + 5} text-anchor="middle">
+          {n.label}
+        </text>
+      </g>
+    ))}
+
+    {subs.map((n) => (
+      <g
+        class="grid-node"
+        data-node={n.id}
+        data-status="ok"
+        tabindex="0"
+        role="button"
+        aria-pressed="false"
+        aria-label={NAMES[n.id]}
+      >
+        <rect
+          class="grid-shape"
+          x={n.x - SUB_W / 2}
+          y={n.y - SUB_H / 2}
+          width={SUB_W}
+          height={SUB_H}
+          rx="8"
+        />
+        <path
+          class="grid-x"
+          d={`M${n.x - 18},${n.y - 18} L${n.x + 18},${n.y + 18} M${n.x + 18},${n.y - 18} L${n.x - 18},${n.y + 18}`}
+        />
+        <text class="grid-label" x={n.x} y={n.y + 5} text-anchor="middle">
+          {n.label}
+        </text>
+      </g>
+    ))}
+  </svg>
+  </div>
+
+  <div class="grid-readout" data-readout>
+    <p class="grid-readout__hint">Hover or tap a station to see its state.</p>
+  </div>
+
+  <div class="grid-bar">
+    <p class="grid-summary" data-summary aria-live="polite">
+      Everything is running. Try clicking Gen 1 to make it fail.
+    </p>
+    <button type="button" class="grid-reset" data-reset>
+      Reset
+    </button>
+  </div>
+
+  <ul class="grid-legend" aria-hidden="true">
+    <li>
+      <span class="swatch swatch--ok"></span>working
+    </li>
+    <li>
+      <span class="swatch swatch--strain"></span>overloaded or low voltage
+    </li>
+    <li>
+      <span class="swatch swatch--dark"></span>no power
+    </li>
+    <li>
+      <span class="swatch swatch--failed">✕</span>failed
+    </li>
+  </ul>
+
+  <figcaption>
+    Click a station to fail it, click again to fix it. The predictions come from
+    a few hand-written rules standing in for what a trained world model would
+    learn, not from real power-flow maths.
+  </figcaption>
+</figure>
+
+<style>
+  /* Lines: live ones carry power and thicken with it (width set inline by the
+     script); dead ones go dashed and faint. */
+  .grid-line {
+    stroke: var(--ink);
+    stroke-width: 2;
+    transition:
+      stroke-width var(--dur-slow) var(--ease-in-out),
+      opacity var(--dur-slow) var(--ease-in-out);
+  }
+
+  .grid-line[data-flow="off"] {
+    stroke: var(--muted);
+    stroke-dasharray: 5 5;
+    opacity: 0.5;
+  }
+
+  .grid-node {
+    cursor: pointer;
+    outline: none;
+  }
+
+  .grid-shape {
+    fill: var(--canvas-raised);
+    stroke: var(--ink);
+    stroke-width: 1.5;
+    transition:
+      fill var(--dur-fast) var(--ease-out),
+      stroke var(--dur-fast) var(--ease-out);
+  }
+
+  .grid-label {
+    font-family: var(--font-body);
+    font-size: 15px;
+    fill: var(--ink);
+    pointer-events: none;
+  }
+
+  .grid-x {
+    display: none;
+    stroke: var(--ink);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    pointer-events: none;
+  }
+
+  .grid-node:hover .grid-shape {
+    stroke-width: 2.5;
+  }
+
+  .grid-node:focus-visible .grid-shape {
+    stroke: var(--accent);
+    stroke-width: 3;
+  }
+
+  .grid-node[data-status="strained"] .grid-shape {
+    stroke: var(--accent);
+    stroke-width: 2;
+  }
+
+  .grid-node[data-status="overloaded"] .grid-shape,
+  .grid-node[data-status="brownout"] .grid-shape {
+    fill: var(--accent-soft);
+    stroke: var(--accent);
+    stroke-width: 2.5;
+  }
+
+  .grid-node[data-status="dark"] .grid-shape,
+  .grid-node[data-status="idle"] .grid-shape,
+  .grid-node[data-status="failed"] .grid-shape {
+    fill: var(--canvas);
+    stroke: var(--muted);
+    stroke-dasharray: 4 4;
+  }
+
+  .grid-node[data-status="dark"] .grid-label,
+  .grid-node[data-status="idle"] .grid-label,
+  .grid-node[data-status="failed"] .grid-label {
+    fill: var(--muted);
+  }
+
+  .grid-node[data-status="failed"] .grid-x {
+    display: inline;
+    stroke: var(--muted);
+  }
+
+  /* The cross sits behind the label; a halo in the page colour keeps the
+     name readable where the strokes cross it. */
+  .grid-node[data-status="failed"] .grid-label {
+    paint-order: stroke;
+    stroke: var(--canvas);
+    stroke-width: 5px;
+    stroke-linejoin: round;
+  }
+
+  /* Prose.astro styles every p, ul and li in an article at (0,2,1), so the
+     text rules below carry a .grid-sim prefix to outrank it. */
+
+  /* Readout: the hovered station's state, as the three numbers the paragraph
+     above names. A panel, not a floating tooltip - it works the same on
+     touch, where there is no hover, and never clips at the viewport edge. */
+  .grid-readout {
+    min-height: 4.5rem;
+    margin-top: var(--space-s);
+    padding: var(--space-xs) var(--space-s);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--canvas-raised);
+    font-size: var(--step--1);
+  }
+
+  .grid-sim .grid-readout__hint {
+    margin: 0;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .grid-readout :global(.grid-readout__head) {
+    margin: 0 0 var(--space-3xs);
+  }
+
+  .grid-readout :global(.grid-readout__status) {
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .grid-readout :global(dl) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3xs) var(--space-l);
+    margin: 0;
+  }
+
+  .grid-readout :global(dt) {
+    color: var(--muted);
+  }
+
+  .grid-readout :global(dd) {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .grid-bar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-s);
+    margin-top: var(--space-xs);
+  }
+
+  .grid-sim .grid-summary {
+    margin: 0;
+    font-size: var(--step--1);
+    line-height: 1.5;
+  }
+
+  .grid-reset {
+    flex: 0 0 auto;
+    font: inherit;
+    font-size: var(--step--1);
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 0.3em 0.8em;
+    cursor: pointer;
+    transition:
+      border-color var(--dur-fast) var(--ease-out),
+      transform var(--dur-instant) var(--ease-out);
+  }
+
+  .grid-reset:hover {
+    border-color: var(--ink);
+  }
+
+  .grid-reset:active {
+    transform: scale(0.96);
+  }
+
+  .grid-sim .grid-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3xs) var(--space-m);
+    list-style: none;
+    padding: 0;
+    margin: var(--space-xs) 0 0;
+    font-size: var(--step--1);
+    color: var(--muted);
+  }
+
+  .grid-sim .grid-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+  }
+
+  .swatch {
+    display: inline-grid;
+    place-items: center;
+    width: 0.9em;
+    height: 0.9em;
+    border-radius: 2px;
+    font-size: 0.8em;
+    line-height: 1;
+    color: var(--ink);
+  }
+
+  .swatch--ok {
+    background: var(--canvas-raised);
+    border: 1.5px solid var(--ink);
+  }
+
+  .swatch--strain {
+    background: var(--accent-soft);
+    border: 2px solid var(--accent);
+  }
+
+  .swatch--dark,
+  .swatch--failed {
+    background: var(--canvas);
+    border: 1.5px dashed var(--muted);
+  }
+</style>
+
+<script>
+  import {
+    predict,
+    type NodeId,
+    type Prediction,
+    type Status,
+  } from "../lib/grid";
+
+  const WORDS: Record<Status, string> = {
+    ok: "working",
+    strained: "working hard",
+    overloaded: "overloaded",
+    brownout: "low voltage (brownout)",
+    dark: "no power",
+    idle: "running, but nothing to power",
+    failed: "failed",
+  };
+
+  const list = (names: string[]) =>
+    names.length <= 1
+      ? names.join("")
+      : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+
+  function summarise(
+    p: Prediction,
+    failed: Set<NodeId>,
+    names: Record<NodeId, string>,
+  ): string {
+    if (failed.size === 0)
+      return "Everything is running. Try clicking Gen 1 to make it fail.";
+    const by = (s: Status) =>
+      (Object.keys(p.nodes) as NodeId[]).filter(
+        (id) => p.nodes[id].status === s && !failed.has(id),
+      );
+    const dark = by("dark").map((id) => names[id]);
+    const over = by("overloaded").map((id) => names[id]);
+    const brown = by("brownout").map((id) => names[id]);
+
+    const out = [
+      `${list([...failed].map((id) => names[id]))} ${failed.size > 1 ? "have" : "has"} failed.`,
+    ];
+    if (dark.length)
+      out.push(`${list(dark)} ${dark.length > 1 ? "lose" : "loses"} power.`);
+    if (over.length)
+      out.push(
+        `${list(over)} ${over.length > 1 ? "are" : "is"} now overloaded, picking up the slack.`,
+      );
+    if (brown.length)
+      out.push(
+        `${list(brown)} ${brown.length > 1 ? "get" : "gets"} low voltage as a result.`,
+      );
+    if (!dark.length && !over.length && !brown.length)
+      out.push("The rest of the grid carries on fine.");
+    return out.join(" ");
+  }
+
+  function init() {
+    document
+      .querySelectorAll<HTMLElement>("[data-grid-sim]:not([data-ready])")
+      .forEach((root) => {
+        root.dataset.ready = "";
+        const names = JSON.parse(root.dataset.names!) as Record<NodeId, string>;
+        const nodes = [...root.querySelectorAll<SVGGElement>("[data-node]")];
+        const lines = [...root.querySelectorAll<SVGLineElement>("[data-line]")];
+        const readout = root.querySelector<HTMLElement>("[data-readout]")!;
+        const summary = root.querySelector<HTMLElement>("[data-summary]")!;
+        const failed = new Set<NodeId>();
+        let shown: NodeId | null = null;
+        let current = predict(failed);
+
+        const show = (id: NodeId) => {
+          shown = id;
+          const s = current.nodes[id];
+          readout.innerHTML =
+            `<p class="grid-readout__head"><strong>${names[id]}</strong> · <span class="grid-readout__status">${WORDS[s.status]}</span></p>` +
+            `<dl><div><dt>Temperature</dt><dd>${s.temperature} °C</dd></div>` +
+            `<div><dt>Voltage</dt><dd>${s.voltage} kV</dd></div>` +
+            `<div><dt>Power</dt><dd>${s.power} MW</dd></div></dl>`;
+        };
+
+        const render = () => {
+          current = predict(failed);
+          for (const el of nodes) {
+            const id = el.dataset.node as NodeId;
+            const s = current.nodes[id];
+            el.dataset.status = s.status;
+            el.setAttribute("aria-pressed", String(failed.has(id)));
+            el.setAttribute(
+              "aria-label",
+              `${names[id]}: ${WORDS[s.status]}, ${s.temperature} degrees, ${s.voltage} kilovolts, ${s.power} megawatts. ` +
+                (failed.has(id) ? "Press to repair." : "Press to fail."),
+            );
+          }
+          for (const el of lines) {
+            const mw = current.flow[el.dataset.line!] ?? 0;
+            el.dataset.flow = mw > 0 ? "on" : "off";
+            el.style.strokeWidth = mw > 0 ? String(1.5 + mw / 10) : "";
+          }
+          summary.textContent = summarise(current, failed, names);
+          if (shown) show(shown);
+        };
+
+        const toggle = (id: NodeId) => {
+          failed.has(id) ? failed.delete(id) : failed.add(id);
+          render();
+          show(id);
+        };
+
+        for (const el of nodes) {
+          const id = el.dataset.node as NodeId;
+          el.addEventListener("pointerenter", () => show(id));
+          el.addEventListener("focus", () => show(id));
+          el.addEventListener("click", () => toggle(id));
+          el.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggle(id);
+            }
+          });
+        }
+
+        root.querySelector("[data-reset]")!.addEventListener("click", () => {
+          failed.clear();
+          render();
+        });
+
+        render();
+      });
+  }
+
+  // astro:page-load fires on first load and after every ClientRouter
+  // navigation - same pattern as Giscus.astro and OfficeScene.astro.
+  document.addEventListener("astro:page-load", init);
+</script>

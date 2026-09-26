@@ -1,0 +1,431 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import TagPill from './TagPill.astro';
+
+type Post = CollectionEntry<'blog'>;
+
+interface Props {
+  posts: Post[];
+  groupByYear?: boolean;
+}
+
+const { posts, groupByYear = false } = Astro.props;
+
+const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+
+// Group newest-first posts by year, preserving order.
+const groups: { year: number; posts: Post[] }[] = [];
+if (groupByYear) {
+  for (const post of posts) {
+    const year = post.data.date.getFullYear();
+    const last = groups[groups.length - 1];
+    if (last && last.year === year) {
+      last.posts.push(post);
+    } else {
+      groups.push({ year, posts: [post] });
+    }
+  }
+}
+
+// groupByYear is only ever true on the homepage's full index, so the
+// newest post overall (first post of the first group) gets the lead
+// treatment there. Tag pages call PostIndex without groupByYear and stay
+// a plain list.
+const leadPost = groupByYear ? groups[0]?.posts[0] : undefined;
+---
+
+{groupByYear ? (
+  <div class="post-index post-index--grouped">
+    {groups.map((group, gi) => (
+      <section class="year-group">
+        <div class="year-marker">
+          <span class="year-marker__num">{group.year}</span>
+        </div>
+        <div class="year-content">
+          {gi === 0 && leadPost && (
+            <article class={`lead ${leadPost.data.cover ? '' : 'lead--text'}`}>
+              {leadPost.data.cover && (
+                <img
+                  class="lead__cover"
+                  src={leadPost.data.cover.src}
+                  alt={leadPost.data.cover.alt}
+                  width="1600"
+                  height="900"
+                />
+              )}
+              <div class="lead__body">
+                <span class="lead__date">{dateFmt.format(leadPost.data.date)}</span>
+                <a class="lead__title-link" href={`/blog/${leadPost.id}/`}>
+                  <h2 class="lead__title">{leadPost.data.title}</h2>
+                </a>
+                <p class="lead__blurb">{leadPost.data.blurb}</p>
+                {leadPost.data.tags.length > 0 && (
+                  <div class="lead__tags">
+                    {leadPost.data.tags.map((tag) => (
+                      <TagPill tag={tag} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </article>
+          )}
+          {group.posts.filter((_, pi) => !(gi === 0 && pi === 0)).length > 0 && (
+            <ul class="rows">
+              {group.posts
+                .filter((_, pi) => !(gi === 0 && pi === 0))
+                .map((post) => (
+                  <li class="row">
+                    <div class="row__inner">
+                      <span class="row__date">{dateFmt.format(post.data.date)}</span>
+                      <div class="row__body">
+                        <a class="row__title-link" href={`/blog/${post.id}/`}>
+                          <span class="row__title">{post.data.title}</span>
+                        </a>
+                        <p class="row__blurb">{post.data.blurb}</p>
+                        {post.data.tags.length > 0 && (
+                          <div class="row__tags">
+                            {post.data.tags.map((tag) => (
+                              <TagPill tag={tag} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+      </section>
+    ))}
+  </div>
+) : (
+  <ul class="post-index rows">
+    {posts.map((post) => (
+      <li class="row">
+        <div class="row__inner">
+          <span class="row__date">{dateFmt.format(post.data.date)}</span>
+          <div class="row__body">
+            <a class="row__title-link" href={`/blog/${post.id}/`}>
+              <span class="row__title">{post.data.title}</span>
+            </a>
+            {/* Outside the <a> so "Side track" doesn't join the link's
+                accessible name — it renders on top of .row__title-link::after
+                (the full-row click overlay) since that's a positioned,
+                z-indexed element and this isn't, so it stays visible. */}
+            {post.data.parent && <span class="row__sidetrack-badge">Side track</span>}
+            <p class="row__blurb">{post.data.blurb}</p>
+            {post.data.tags.length > 0 && (
+              <div class="row__tags">
+                {post.data.tags.map((tag) => (
+                  <TagPill tag={tag} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </li>
+    ))}
+  </ul>
+)}
+
+<style>
+  .rows {
+    list-style: none;
+    padding: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .year-group {
+    display: grid;
+    grid-template-columns: var(--rail) minmax(0, 1fr);
+    gap: var(--space-xl);
+  }
+
+  .year-group + .year-group {
+    margin-top: var(--space-l);
+  }
+
+  .year-group .rows {
+    border-top: none;
+  }
+
+  .year-marker {
+    position: sticky;
+    top: var(--space-l);
+    align-self: start;
+    padding-top: var(--space-m);
+  }
+
+  .year-marker__num {
+    font-family: var(--font-display);
+    font-size: var(--step-3);
+    letter-spacing: var(--tracking-3);
+    color: var(--muted);
+    line-height: 1;
+  }
+
+  .year-content {
+    min-width: 0;
+  }
+
+  /* Lead post - the newest post overall gets an enlarged, varied
+     treatment so the index has real rhythm instead of a uniform list. */
+  .lead {
+    position: relative;
+    padding-bottom: var(--space-l);
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: var(--space-m);
+  }
+
+  .lead__cover {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    margin-bottom: var(--space-m);
+  }
+
+  .lead__date {
+    display: block;
+    font-variant-numeric: tabular-nums;
+    font-size: var(--step--1);
+    color: var(--muted);
+  }
+
+  .lead__title-link {
+    background-image: none;
+  }
+
+  .lead__title-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+
+  .lead__title {
+    display: inline;
+    font-family: var(--font-display);
+    font-size: var(--step-3);
+    letter-spacing: var(--tracking-3);
+    line-height: 1.1;
+    color: var(--ink);
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 1px;
+    transition: background-size var(--dur-fast) var(--ease-out);
+  }
+
+  .lead:hover .lead__title {
+    background-size: 100% 1px;
+  }
+
+  .lead__blurb {
+    margin-top: var(--space-2xs);
+    color: var(--muted);
+    font-size: var(--step-0);
+    max-width: var(--measure);
+  }
+
+  /* No cover: lean on type instead of an image so the lead still reads
+     as deliberate rather than a list row that lost its picture. */
+  .lead--text .lead__title {
+    font-size: var(--step-4);
+    letter-spacing: var(--tracking-4);
+  }
+
+  .lead--text .lead__blurb {
+    font-size: var(--step-1);
+    max-width: var(--measure);
+    margin-top: var(--space-s);
+    border-left: 3px solid var(--accent);
+    padding-left: var(--space-m);
+  }
+
+  .lead__tags {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2xs);
+    margin-top: var(--space-s);
+  }
+
+  .row {
+    position: relative;
+    border-bottom: 1px solid var(--rule);
+    /* Reveal only. The stagger below is set as an inline transition-delay by
+       the script, and inline styles outrank everything - so the hover lift
+       lives on .row__inner, out of that delay's reach. */
+    transition: transform var(--dur-slow) var(--ease-out),
+                opacity var(--dur-slow) var(--ease-out);
+  }
+
+  .row.js-pre {
+    opacity: 0;
+    transform: translateY(12px);
+    will-change: transform, opacity;
+  }
+
+  .row.js-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .row__inner {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-m);
+    padding-block: var(--space-m);
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+
+  .row:hover .row__inner {
+    transform: translateY(-2px);
+  }
+
+  /* Press drops it back under the pointer - feedback on pointer-down, not on
+     release. */
+  .row:active .row__inner {
+    transform: translateY(0);
+  }
+
+  .row__date {
+    flex: 0 0 auto;
+    width: 4rem;
+    font-variant-numeric: tabular-nums;
+    font-size: var(--step--1);
+    color: var(--muted);
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+
+  .row:hover .row__date {
+    color: var(--accent-ink);
+  }
+
+  .row__body {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .row__title-link {
+    background-image: none;
+  }
+
+  .row__title-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+
+  .row__title {
+    display: inline;
+    font-family: var(--font-display);
+    font-size: var(--step-1);
+    color: var(--ink);
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 1px;
+    transition: background-size var(--dur-fast) var(--ease-out);
+  }
+
+  .row:hover .row__title {
+    background-size: 100% 1px;
+  }
+
+  .row__blurb {
+    margin-top: var(--space-3xs);
+    color: var(--muted);
+    font-size: var(--step-0);
+    max-width: var(--measure);
+  }
+
+  /* Tag pages show side tracks (unlike the homepage index), badged so they
+     read as a tangent rather than a peer article. Text itself carries the
+     distinction, not just styling, so it's legible to screen readers too. */
+  .row__sidetrack-badge {
+    display: inline-block;
+    margin-left: var(--space-2xs);
+    font-size: var(--step--1);
+    font-variant-caps: small-caps;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    vertical-align: middle;
+  }
+
+  .row__tags {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2xs);
+    margin-top: var(--space-2xs);
+  }
+
+  @media (max-width: 768px) {
+    .year-group {
+      grid-template-columns: 1fr;
+      gap: var(--space-xs);
+    }
+
+    .year-marker {
+      position: static;
+      padding-top: 0;
+    }
+
+    .year-marker__num {
+      font-size: var(--step-2);
+      /* Tracking follows size down, and --step-2 is below where tightening is
+         worth anything. */
+      letter-spacing: normal;
+    }
+
+    .lead--text .lead__title {
+      font-size: var(--step-3);
+      letter-spacing: var(--tracking-3);
+    }
+
+    .row__inner {
+      gap: var(--space-s);
+    }
+
+    .row__date {
+      width: 3.25rem;
+    }
+  }
+</style>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    var rows = document.querySelectorAll('.row');
+    if (!rows.length) return;
+
+    rows.forEach(function (row, i) {
+      row.classList.add('js-pre');
+      row.style.transitionDelay = Math.min(i * 24, 200) + 'ms';
+    });
+
+    var observer = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.remove('js-pre');
+            entry.target.classList.add('js-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
+    );
+
+    rows.forEach(function (row) {
+      observer.observe(row);
+    });
+  })();
+</script>

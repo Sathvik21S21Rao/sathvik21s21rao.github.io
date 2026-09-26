@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340" width="720" height="340" role="img" aria-labelledby="f5-title f5-desc">
+  <title id="f5-title">Checking plans before running them</title>
+  <desc id="f5-desc">An AI agent comes up with three plans. The world model imagines each one without running anything. Plan A misses the goal and is thrown away. Plan B reaches the goal cheaply. Plan C reaches the goal but costs a lot. Only Plan B, the cheapest plan that works, is done for real, just once.</desc>
+  <!-- Same conventions as world-model-loop.svg: site tokens with light-theme
+       fallbacks, prefixed class names (an inline SVG's <style> is page-global),
+       dotted amber = imagined, solid = real. -->
+  <style>
+    .f5-ln { fill: none; stroke: var(--ink, #16221C); stroke-width: 1.5; }
+    .f5-head { fill: var(--ink, #16221C); }
+    .f5-bx { fill: var(--canvas-raised, #E8EAE1); stroke: var(--ink, #16221C); stroke-width: 1.5; }
+    .f5-win { fill: var(--accent-soft, #C8801F1a); stroke: var(--accent, #C8801F); stroke-width: 2.5; }
+    .f5-real { fill: var(--canvas-raised, #E8EAE1); stroke: var(--ink, #16221C); stroke-width: 2.5; }
+    .f5-out { opacity: 0.5; }
+    .f5-t { font-family: var(--font-body, Georgia, serif); font-size: 16px; fill: var(--ink, #16221C); }
+    .f5-b { font-weight: 600; }
+    .f5-s { font-family: var(--font-body, Georgia, serif); font-size: 13px; font-style: italic; fill: var(--muted, #5B655C); }
+    .f5-zone { fill: none; stroke: var(--accent, #C8801F); stroke-width: 1.5; stroke-dasharray: 2 4; stroke-linecap: round; }
+    .f5-zl { font-family: var(--font-display, Georgia, serif); font-size: 16px; fill: var(--accent-ink, #8F5A0D); }
+    .f5-wl { font-family: var(--font-body, Georgia, serif); font-size: 13px; font-weight: 600; fill: var(--accent-ink, #8F5A0D); }
+    .f5-coin { fill: var(--accent, #C8801F); }
+    .f5-ok { fill: none; stroke: var(--ink, #16221C); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="f5-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="f5-head" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+  </defs>
+
+  <!-- the agent -->
+  <rect class="f5-bx" x="20" y="150" width="124" height="50" rx="8"/>
+  <text class="f5-t" x="82" y="180" text-anchor="middle">AI agent</text>
+  <text class="f5-s" x="82" y="222" text-anchor="middle">comes up with</text>
+  <text class="f5-s" x="82" y="239" text-anchor="middle">three plans</text>
+  <path class="f5-ln" d="M144,175 H170 V80 H196" marker-end="url(#f5-arrow)"/>
+  <path class="f5-ln" d="M144,175 H196" marker-end="url(#f5-arrow)"/>
+  <path class="f5-ln" d="M170,175 V270 H196" marker-end="url(#f5-arrow)"/>
+
+  <!-- everything inside this line is imagined -->
+  <rect class="f5-zone" x="182" y="24" width="374" height="298" rx="16"/>
+  <text class="f5-zl" x="369" y="47" text-anchor="middle">the world model imagines each plan</text>
+  <text class="f5-s" x="369" y="310" text-anchor="middle">nothing has actually run yet</text>
+
+  <!-- Plan A: misses the goal, thrown away -->
+  <g class="f5-out">
+    <rect class="f5-bx" x="200" y="58" width="110" height="44" rx="8"/>
+    <text class="f5-t" x="255" y="85" text-anchor="middle">Plan A</text>
+    <path class="f5-ln" d="M310,80 H346" marker-end="url(#f5-arrow)"/>
+    <rect class="f5-bx" x="350" y="54" width="190" height="52" rx="8"/>
+    <path class="f5-ok" d="M362,69 L374,81 M374,69 L362,81"/>
+    <text class="f5-t" x="384" y="79">misses the goal</text>
+    <text class="f5-s" x="384" y="97">thrown away</text>
+  </g>
+
+  <!-- Plan B: the winner -->
+  <text class="f5-wl" x="445" y="141" text-anchor="middle">cheapest plan that works</text>
+  <rect class="f5-win" x="200" y="153" width="110" height="44" rx="8"/>
+  <text class="f5-t f5-b" x="255" y="180" text-anchor="middle">Plan B</text>
+  <path class="f5-ln" d="M310,175 H346" marker-end="url(#f5-arrow)"/>
+  <rect class="f5-win" x="350" y="149" width="190" height="52" rx="8"/>
+  <path class="f5-ok" d="M362,170 L367,176 L376,164"/>
+  <text class="f5-t" x="384" y="174">reaches the goal</text>
+  <text class="f5-s" x="384" y="192">cost</text>
+  <circle class="f5-coin" cx="419" cy="188" r="5"/>
+
+  <!-- Plan C: works, but costs more -->
+  <rect class="f5-bx" x="200" y="248" width="110" height="44" rx="8"/>
+  <text class="f5-t" x="255" y="275" text-anchor="middle">Plan C</text>
+  <path class="f5-ln" d="M310,270 H346" marker-end="url(#f5-arrow)"/>
+  <rect class="f5-bx" x="350" y="244" width="190" height="52" rx="8"/>
+  <path class="f5-ok" d="M362,265 L367,271 L376,259"/>
+  <text class="f5-t" x="384" y="269">reaches the goal</text>
+  <text class="f5-s" x="384" y="287">cost</text>
+  <circle class="f5-coin" cx="419" cy="283" r="5"/>
+  <circle class="f5-coin" cx="433" cy="283" r="5"/>
+  <circle class="f5-coin" cx="447" cy="283" r="5"/>
+
+  <!-- only the winner leaves the imagined zone -->
+  <path class="f5-ln" d="M540,175 H592" marker-end="url(#f5-arrow)"/>
+  <rect class="f5-real" x="596" y="150" width="112" height="50" rx="8"/>
+  <text class="f5-t" x="652" y="180" text-anchor="middle">do it for real</text>
+  <text class="f5-s" x="652" y="222" text-anchor="middle">just once</text>
+</svg>

@@ -1,0 +1,45 @@
+---
+// Small pill linking to a tag's archive page. Slug rule (shared with tag pages):
+// lowercase, trim, spaces collapsed to hyphens.
+export function slugify(tag: string): string {
+  return tag.toLowerCase().trim().replace(/\s+/g, '-');
+}
+
+interface Props {
+  tag: string;
+}
+
+const { tag } = Astro.props;
+---
+
+<a class="tag-pill" href={`/tags/${slugify(tag)}/`}>{tag}</a>
+
+<style>
+  .tag-pill {
+    display: inline-block;
+    font-size: var(--step--1);
+    /* Small text reads slightly positive tracking as more legible. */
+    letter-spacing: var(--tracking--1);
+    line-height: 1;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    background-image: none;
+    padding: 0.3em 0.65em;
+    border-radius: var(--radius);
+    white-space: nowrap;
+    transition: transform var(--dur-instant) var(--ease-out);
+  }
+
+  .tag-pill:hover,
+  .tag-pill:focus-visible {
+    text-decoration: underline;
+  }
+
+  /* Press feedback on pointer-down, not release - this is a pill-shaped
+     object, not inline prose. No reduced-motion exception needed: the
+     global blanket rule zeroes the duration, not the transform, so this
+     still fires, just instantly. */
+  .tag-pill:active {
+    transform: scale(0.96);
+  }
+</style>

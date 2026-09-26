@@ -1,0 +1,92 @@
+---
+import { site } from "../config";
+
+const { repo, repoId, category, categoryId } = site.giscus;
+// Repo doesn't exist yet at times during setup; build must still succeed,
+// so render nothing at all rather than a broken/placeholder widget.
+const enabled = Boolean(repo && repoId && categoryId);
+---
+
+{enabled && (
+  <section class="giscus-section" aria-labelledby="comments-heading">
+    <h2 id="comments-heading">Comments</h2>
+    <p class="giscus-note">
+      Commenting uses a GitHub account, via GitHub Discussions.
+    </p>
+    <div id="giscus-container"></div>
+  </section>
+)}
+
+{enabled && <script
+  is:inline
+  define:vars={{ repo, repoId, category, categoryId }}
+>
+  (function () {
+    function currentTheme() {
+      const attr = document.documentElement.getAttribute("data-theme");
+      const dark = attr
+        ? attr === "dark"
+        : window.matchMedia("(prefers-color-scheme: dark)").matches;
+      return dark ? "dark_dim" : "light";
+    }
+
+    function loadGiscus() {
+      const container = document.getElementById("giscus-container");
+      if (!container) return;
+      container.innerHTML = "";
+
+      const script = document.createElement("script");
+      script.src = "https://giscus.app/client.js";
+      script.async = true;
+      script.crossOrigin = "anonymous";
+      script.setAttribute("data-repo", repo);
+      script.setAttribute("data-repo-id", repoId);
+      script.setAttribute("data-category", category);
+      script.setAttribute("data-category-id", categoryId);
+      script.setAttribute("data-mapping", "pathname");
+      script.setAttribute("data-strict", "1");
+      script.setAttribute("data-reactions-enabled", "1");
+      script.setAttribute("data-emit-metadata", "0");
+      script.setAttribute("data-input-position", "top");
+      script.setAttribute("data-lang", "en");
+      script.setAttribute("data-loading", "lazy");
+      script.setAttribute("data-theme", currentTheme());
+
+      container.appendChild(script);
+    }
+
+    function syncTheme(theme) {
+      const iframe = document.querySelector("iframe.giscus-frame");
+      if (!iframe || !iframe.contentWindow) return;
+      const mapped = theme === "dark" ? "dark_dim" : "light";
+      iframe.contentWindow.postMessage(
+        { giscus: { setConfig: { theme: mapped } } },
+        "https://giscus.app",
+      );
+    }
+
+    // astro:page-load fires once on initial load and again after every
+    // view-transition navigation, so this alone covers both cases.
+    document.addEventListener("astro:page-load", loadGiscus);
+    window.addEventListener("theme-change", (e) => syncTheme(e.detail.theme));
+  })();
+</script>}
+
+<style>
+  .giscus-section {
+    margin-top: var(--space-2xl);
+    padding-top: var(--space-l);
+    border-top: 1px solid var(--rule);
+  }
+
+  .giscus-section h2 {
+    font-size: var(--step-2);
+    margin-bottom: var(--space-2xs);
+  }
+
+  .giscus-note {
+    color: var(--muted);
+    font-size: var(--step--1);
+    margin-bottom: var(--space-m);
+  }
+</style>

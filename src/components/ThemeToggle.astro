@@ -1,0 +1,131 @@
+---
+// Tabler outline icons ship as plain .svg files (no React) - inline the raw
+// markup at build time instead of hand-rolling icon paths.
+import sunSvg from '@tabler/icons/outline/sun.svg?raw';
+import moonSvg from '@tabler/icons/outline/moon.svg?raw';
+
+// Tabler's root <svg> already carries stroke="currentColor" so it inherits
+// colour from CSS; swap its class so the existing show/hide + sizing rules
+// below (.icon, .icon-sun, .icon-moon) keep working unchanged.
+const sun = sunSvg
+  .replace(/class="[^"]*"/, 'class="icon icon-sun"')
+  .replace('<svg', '<svg aria-hidden="true"');
+const moon = moonSvg
+  .replace(/class="[^"]*"/, 'class="icon icon-moon"')
+  .replace('<svg', '<svg aria-hidden="true"');
+---
+
+<button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle colour theme">
+  <Fragment set:html={sun} />
+  <Fragment set:html={moon} />
+</button>
+
+<style>
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: var(--radius);
+    transition: color var(--dur-fast) var(--ease-out),
+                transform var(--dur-instant) var(--ease-out);
+  }
+
+  .theme-toggle:hover {
+    color: var(--ink);
+  }
+
+  /* Press feedback on pointer-down, not release - this is a button-shaped
+     object, not inline prose. No reduced-motion exception needed: the
+     global blanket rule zeroes the duration, not the transform, so this
+     still fires, just instantly. */
+  .theme-toggle:active {
+    transform: scale(0.92);
+  }
+
+  /* Custom properties don't interpolate, so the palette can't be transitioned
+     directly - the consuming properties are. Scoped to a class the toggle adds
+     and removes, so this universal selector is live for ~420ms per click and
+     never during normal browsing. It also deliberately outranks the global
+     reduced-motion blanket ((0,2,0) vs (0,0,0), both !important): a colour
+     cross-fade is the non-vestibular feedback reduced-motion actually wants.
+     opacity is in the list because this !important shorthand resets
+     transition-property on everything it matches - without it, OfficeScene's
+     day/night crossfade (an opacity swap driven by the same [data-theme])
+     loses its own transition for these 420ms and hard-cuts. */
+  :global(:root.theme-fading),
+  :global(:root.theme-fading *) {
+    transition: background-color var(--dur-slow) var(--ease-in-out),
+                color var(--dur-slow) var(--ease-in-out),
+                border-color var(--dur-slow) var(--ease-in-out),
+                opacity var(--dur-slow) var(--ease-in-out) !important;
+  }
+
+  /* The icons are injected via set:html (raw Tabler markup), so Astro can't
+     stamp them with its scoped-style attribute - these rules must stay
+     :global() or they silently never match. */
+  :global(.icon) {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  :global(.icon-sun) {
+    display: none;
+  }
+
+  :global(.icon-moon) {
+    display: block;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light']) .icon-sun) {
+      display: block;
+    }
+    :global(:root:not([data-theme='light']) .icon-moon) {
+      display: none;
+    }
+  }
+
+  :global(:root[data-theme='dark'] .icon-sun) {
+    display: block;
+  }
+  :global(:root[data-theme='dark'] .icon-moon) {
+    display: none;
+  }
+</style>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    const button = document.getElementById('theme-toggle');
+    if (!button) return;
+
+    button.addEventListener('click', () => {
+      const root = document.documentElement;
+      const current =
+        root.getAttribute('data-theme') ||
+        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      const next = current === 'dark' ? 'light' : 'dark';
+
+      // Order matters, and the flush is load-bearing. A transition only starts
+      // if transition-property was already resolved when the value changed - so
+      // adding .theme-fading and flipping data-theme in one task means the
+      // browser sees both in a single style recalc and the palette jumps with
+      // no fade. Verified in Chrome: without the getComputedStyle read the
+      // background lands on the target colour immediately.
+      root.classList.add('theme-fading');
+      getComputedStyle(root).backgroundColor;
+      root.setAttribute('data-theme', next);
+      // 480, not 420: removing the class at exactly the transition's duration
+      // races it, and losing that race cancels the fade into a snap.
+      setTimeout(() => root.classList.remove('theme-fading'), 480);
+      localStorage.setItem('theme', next);
+      window.dispatchEvent(new CustomEvent('theme-change', { detail: { theme: next } }));
+    });
+  })();
+</script>

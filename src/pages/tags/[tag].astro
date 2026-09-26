@@ -1,0 +1,95 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostIndex from '../../components/PostIndex.astro';
+import { slugify } from '../../components/TagPill.astro';
+
+export async function getStaticPaths() {
+  const allPosts = await getCollection('blog', (entry) =>
+    import.meta.env.PROD ? !entry.data.draft : true
+  );
+
+  const bySlug = new Map<string, { label: string; posts: typeof allPosts }>();
+  for (const post of allPosts) {
+    for (const tag of post.data.tags) {
+      const slug = slugify(tag);
+      const entry = bySlug.get(slug);
+      if (entry) {
+        entry.posts.push(post);
+      } else {
+        bySlug.set(slug, { label: tag, posts: [post] });
+      }
+    }
+  }
+
+  return [...bySlug.entries()].map(([slug, { label, posts }]) => ({
+    params: { tag: slug },
+    props: { label, posts },
+  }));
+}
+
+const { label, posts } = Astro.props;
+const sorted = posts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+---
+
+<BaseLayout title={`Posts tagged "${label}"`} description={`Everything tagged "${label}".`}>
+  <header class="tag-header">
+    <div class="tag-header__mark" aria-hidden="true"></div>
+    <div class="tag-header__main">
+      <h1>Posts tagged &ldquo;{label}&rdquo;</h1>
+      <p><a href="/tags/">All tags</a> &middot; <a href="/writing">All writing</a></p>
+    </div>
+  </header>
+
+  <PostIndex posts={sorted} />
+</BaseLayout>
+
+<style>
+  .tag-header {
+    display: grid;
+    grid-template-columns: var(--rail) 1fr;
+    column-gap: var(--space-m);
+    align-items: end;
+    padding-block: var(--space-2xl) var(--space-l);
+  }
+
+  .tag-header__mark {
+    grid-column: 1;
+    align-self: stretch;
+    border-left: 2px solid var(--accent);
+    min-height: 2rem;
+  }
+
+  .tag-header__main {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .tag-header h1 {
+    font-family: var(--font-display);
+    font-size: var(--step-3);
+  }
+
+  .tag-header p {
+    margin-top: var(--space-xs);
+    color: var(--muted);
+  }
+
+  @media (max-width: 768px) {
+    .tag-header {
+      grid-template-columns: 1fr;
+      row-gap: var(--space-s);
+    }
+
+    .tag-header__mark {
+      border-left: none;
+      border-top: 2px solid var(--accent);
+      min-height: 0;
+      width: 3rem;
+    }
+
+    .tag-header__main {
+      grid-column: 1;
+    }
+  }
+</style>

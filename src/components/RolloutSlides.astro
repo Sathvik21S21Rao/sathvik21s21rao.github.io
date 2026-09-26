@@ -1,0 +1,947 @@
+---
+// Step-through figure for graph-world-models-case-study.mdx: the fixed-edge
+// GWM from the post, rolled forward one action at a time - for either of the
+// post's two plans. The wiring (drawn once below) never moves - only node
+// features do, which is the whole point, so STEPS only ever touches
+// text/status, never geometry. The graph drawing is shared between plans;
+// only the per-plan step data differs.
+//
+// Same shape as GridSim.astro: data in frontmatter, inline SVG, one script
+// that inits on astro:page-load with a data-ready guard. Slide 0 of the
+// default plan is rendered server-side, so with no JS the figure shows that
+// one slide correctly but is not steppable - there is no text fallback for
+// the rest of the rollout. With JS, the script re-points the same
+// nodes/edges/readout at whichever plan and step are active.
+
+import katex from "katex";
+
+// Build-time only: turns "G_0" into KaTeX markup once, at build time, not on
+// every render. rehype-katex only walks markdown, not this component's own
+// labels, so the handful that need maths render it here directly.
+const tex = (s: string) => katex.renderToString(s, { throwOnError: true });
+
+type ChipStatus = "ok" | "unknown" | "bad";
+type ToolId = "read" | "edit" | "compile" | "test";
+type FileId = "format" | "cli" | "test_cli";
+type PlanId = "a" | "b";
+
+interface RawStep {
+  actionHtml: string; // what actually renders - plain text or KaTeX markup mixed in
+  fire: [ToolId, FileId] | null;
+  files: Record<FileId, [ChipStatus, ChipStatus]>;
+  context: string;
+  note: string;
+  tokens: number; // this step's own cost, not cumulative
+  seconds: number;
+  verdict: { text: string; status: "ok" | "bad" } | null; // set only on a plan's last step
+}
+
+// Both plans start from the same rest state - duplicated into each plan's
+// step array below (`{ ...BASELINE }`) rather than shared by reference, so
+// each plan's steps are a plain, independent array.
+const BASELINE: RawStep = {
+  actionHtml: `${tex("G_0")} — before the plan`,
+  fire: null,
+  files: {
+    format: ["ok", "ok"],
+    cli: ["ok", "ok"],
+    test_cli: ["ok", "ok"],
+  },
+  context: "the task, nothing read yet",
+  note: "Baseline: everything compiles, every test is green. The task: add a --json flag to the CLI.",
+  tokens: 0,
+  seconds: 0,
+  verdict: null,
+};
+
+const PLAN_A_RAW: RawStep[] = [
+  { ...BASELINE },
+  {
+    actionHtml: "edit(format.py, cli.py)",
+    fire: ["edit", "cli"],
+    files: {
+      format: ["unknown", "unknown"],
+      cli: ["unknown", "unknown"],
+      test_cli: ["ok", "unknown"],
+    },
+    context: "wrote as_json() and the flag in one go",
+    note: "One action, both files. Everything it touches goes unknown at once — and with nothing verified in between, there is no checkpoint to fall back to.",
+    tokens: 2600,
+    seconds: 6,
+    verdict: null,
+  },
+  {
+    actionHtml: "compile",
+    fire: ["compile", "cli"],
+    files: {
+      format: ["ok", "unknown"],
+      cli: ["bad", "bad"],
+      test_cli: ["ok", "bad"],
+    },
+    context: "cli.py does not compile",
+    note: "This is what the training traces predict: a large simultaneous edit rarely compiles the first time. The failure lands on cli.py and travels along the import edge to everything tested through it.",
+    tokens: 300,
+    seconds: 6,
+    verdict: null,
+  },
+  {
+    actionHtml: `test — ${tex("G_T")}`,
+    fire: ["test", "test_cli"],
+    files: {
+      format: ["ok", "unknown"],
+      cli: ["bad", "bad"],
+      test_cli: ["ok", "bad"],
+    },
+    context: "goal not reached",
+    note: "The terminal graph has a red test node, so the goal check fails and Plan A is infeasible — at 3.3k tok · 22s, roughly half of Plan B. Cost only breaks ties between plans that reach the goal, so being the cheaper plan buys it nothing.",
+    tokens: 400,
+    seconds: 10,
+    verdict: { text: "goal check: failed — infeasible", status: "bad" },
+  },
+];
+
+const PLAN_B_RAW: RawStep[] = [
+  { ...BASELINE },
+  {
+    actionHtml: "read(format.py)",
+    fire: ["read", "format"],
+    files: {
+      format: ["ok", "ok"],
+      cli: ["ok", "ok"],
+      test_cli: ["ok", "ok"],
+    },
+    context: "knows format.py's API",
+    note: "A read moves no file features at all — only the context node changes. That is the cheapest action the agent has.",
+    tokens: 800,
+    seconds: 1,
+    verdict: null,
+  },
+  {
+    actionHtml: "edit(format.py)",
+    fire: ["edit", "format"],
+    files: {
+      format: ["unknown", "unknown"],
+      cli: ["unknown", "unknown"],
+      test_cli: ["ok", "unknown"],
+    },
+    context: "wrote as_json(), unverified",
+    note: "Adds as_json(). format.py's own flags go unknown, and the doubt travels out along the dependency edges to everything that imports it.",
+    tokens: 2100,
+    seconds: 4,
+    verdict: null,
+  },
+  {
+    actionHtml: "compile",
+    fire: ["compile", "format"],
+    files: {
+      format: ["ok", "unknown"],
+      cli: ["ok", "unknown"],
+      test_cli: ["ok", "unknown"],
+    },
+    context: "as_json() compiles",
+    note: "Compiling settles the compile flags. Nothing here yet says the behaviour is right.",
+    tokens: 300,
+    seconds: 6,
+    verdict: null,
+  },
+  {
+    actionHtml: "test",
+    fire: ["test", "test_cli"],
+    files: {
+      format: ["ok", "ok"],
+      cli: ["ok", "ok"],
+      test_cli: ["ok", "ok"],
+    },
+    context: "helper works, flag not wired",
+    note: "The existing tests still pass, so the new helper broke nothing. Plan B's first checkpoint — reached at under a fifth of the plan's cost.",
+    tokens: 400,
+    seconds: 12,
+    verdict: null,
+  },
+  {
+    actionHtml: "edit(cli.py)",
+    fire: ["edit", "cli"],
+    files: {
+      format: ["ok", "ok"],
+      cli: ["unknown", "unknown"],
+      test_cli: ["ok", "unknown"],
+    },
+    context: "wired --json into the CLI",
+    note: "Only cli.py and its dependents go unknown. format.py keeps the green it just earned — that is what the edges buy you.",
+    tokens: 1700,
+    seconds: 3,
+    verdict: null,
+  },
+  {
+    actionHtml: "compile",
+    fire: ["compile", "cli"],
+    files: {
+      format: ["ok", "ok"],
+      cli: ["ok", "unknown"],
+      test_cli: ["ok", "unknown"],
+    },
+    context: "--json parses",
+    note: "Same move as step 3, one file over.",
+    tokens: 300,
+    seconds: 6,
+    verdict: null,
+  },
+  {
+    actionHtml: `test — ${tex("G_T")}`,
+    fire: ["test", "test_cli"],
+    files: {
+      format: ["ok", "ok"],
+      cli: ["ok", "ok"],
+      test_cli: ["ok", "ok"],
+    },
+    context: "goal reached",
+    note: "The terminal graph: every file compiles, every test green, so the goal check passes and Plan B is feasible. Plan A reaches this same graph with the test node red, which is why the cheaper plan loses.",
+    tokens: 500,
+    seconds: 14,
+    verdict: { text: "goal check: passed — feasible", status: "ok" },
+  },
+];
+
+// Cumulative cost is derived here, once per plan, from the per-step numbers
+// above - nothing downstream (server render or client script) hand-maintains
+// a second running total.
+function withCumulative(steps: RawStep[]) {
+  let cumTokens = 0;
+  let cumSeconds = 0;
+  return steps.map((s, i) => {
+    cumTokens += s.tokens;
+    cumSeconds += s.seconds;
+    return {
+      ...s,
+      costLabel:
+        i === 0
+          ? "—"
+          : `${(cumTokens / 1000).toFixed(1)}k tok · ${cumSeconds}s`,
+    };
+  });
+}
+
+const PLANS: {
+  id: PlanId;
+  label: string;
+  steps: ReturnType<typeof withCumulative>;
+}[] = [
+  {
+    id: "a",
+    label: "Plan A — one big edit",
+    steps: withCumulative(PLAN_A_RAW),
+  },
+  {
+    id: "b",
+    label: "Plan B — one file at a time",
+    steps: withCumulative(PLAN_B_RAW),
+  },
+];
+const DEFAULT_PLAN: PlanId = "b";
+
+const SYMBOL: Record<ChipStatus, string> = { ok: "✓", unknown: "?", bad: "✗" };
+const WORD: Record<ChipStatus, string> = {
+  ok: "yes",
+  unknown: "unknown",
+  bad: "no",
+};
+
+// Layout constants - a fixed-edge graph, so these never change across
+// slides or plans.
+const CONTEXT = { x: 20, y: 15, w: 210, h: 60 };
+const TOOL_W = 140;
+const TOOL_H = 44;
+const TOOLS = (
+  [
+    { id: "read" as ToolId, label: "read", y: 110 },
+    { id: "edit" as ToolId, label: "edit", y: 178 },
+    { id: "compile" as ToolId, label: "compile", y: 246 },
+    { id: "test" as ToolId, label: "test", y: 314 },
+  ] as const
+).map((t) => ({ ...t, x: 60, cy: t.y + TOOL_H / 2 }));
+
+const FILE_W = 220;
+const FILE_H = 80;
+const FILES = (
+  [
+    { id: "format" as FileId, label: "format.py", y: 20 },
+    { id: "cli" as FileId, label: "cli.py", y: 170 },
+    { id: "test_cli" as FileId, label: "test_cli.py", y: 320 },
+  ] as const
+).map((f) => ({ ...f, x: 470, cy: f.y + FILE_H / 2 }));
+
+const s0 = PLANS.find((p) => p.id === DEFAULT_PLAN)!.steps[0];
+
+function fileSummary(label: string, c: ChipStatus, t: ChipStatus) {
+  return `${label}: compiles ${WORD[c]}, tests ${WORD[t]}`;
+}
+---
+
+<figure
+  class="rollout-slides"
+  data-rollout
+  data-default-plan={DEFAULT_PLAN}
+  data-plans={JSON.stringify(
+    Object.fromEntries(PLANS.map((p) => [p.id, p.steps])),
+  )}
+>
+  <div class="rw-plans" role="group" aria-label="Choose a plan">
+    {PLANS.map((p) => (
+      <button
+        type="button"
+        class="rw-plan-btn"
+        data-plan-btn={p.id}
+        aria-pressed={p.id === DEFAULT_PLAN ? "true" : "false"}
+      >
+        {p.label}
+      </button>
+    ))}
+  </div>
+
+  <div class="figure-diagram">
+    <svg
+      viewBox="0 0 720 430"
+      width="720"
+      height="430"
+      role="group"
+      aria-label="A fixed-edge graph world model: a context node wired to four tool nodes - read, edit, compile, test - each wired to all three file nodes - format.py, cli.py, test_cli.py - which also depend on each other. The wiring never changes as the plan rolls forward; only the status on each node does."
+    >
+      <defs>
+        <marker
+          id="rw-arrow"
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="7"
+          markerHeight="7"
+          orient="auto-start-reverse"
+        >
+          <path class="rw-arrow-head" d="M0,0 L10,5 L0,10 z" />
+        </marker>
+        <marker
+          id="rw-arrow-muted"
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="6"
+          markerHeight="6"
+          orient="auto-start-reverse"
+        >
+          <path class="rw-arrow-head-muted" d="M0,0 L10,5 L0,10 z" />
+        </marker>
+      </defs>
+
+      {/* tool -> file edges: all 12 exist, faint; the one firing edge is
+          switched bright by the script (or server-rendered bright for
+          slide 0, which has none firing). */}
+      {TOOLS.flatMap((t) =>
+        FILES.map((f) => (
+          <line
+            class="rw-edge"
+            data-edge={`${t.id}-${f.id}`}
+            x1={t.x + TOOL_W}
+            y1={t.cy}
+            x2={f.x}
+            y2={f.cy}
+          />
+        )),
+      )}
+
+      {/* context -> tool: one spine, four short stubs, not four long curves */}
+      <path
+        class="rw-spine"
+        d={`M40,${CONTEXT.y + CONTEXT.h} V${TOOLS[TOOLS.length - 1].cy}`}
+      />
+      {TOOLS.map((t) => (
+        <line class="rw-stub" x1="40" y1={t.cy} x2={t.x} y2={t.cy} />
+      ))}
+
+      {/* file -> file dependency arcs, dependent -> dependency */}
+      <path
+        class="rw-dep"
+        d={`M690,${FILES[1].cy} C712,${FILES[1].cy - 30} 712,${FILES[0].cy + 30} 690,${FILES[0].cy}`}
+        marker-end="url(#rw-arrow-muted)"
+      />
+      <path
+        class="rw-dep"
+        d={`M690,${FILES[2].cy} C702,${FILES[2].cy - 30} 702,${FILES[1].cy + 30} 690,${FILES[1].cy}`}
+        marker-end="url(#rw-arrow-muted)"
+      />
+      <text
+        class="rw-dep-label"
+        x="706"
+        y="135"
+        text-anchor="middle"
+        transform="rotate(-90 706 135)"
+      >
+        imports
+      </text>
+
+      <g class="rw-context">
+        <rect
+          class="rw-context-box"
+          x={CONTEXT.x}
+          y={CONTEXT.y}
+          width={CONTEXT.w}
+          height={CONTEXT.h}
+          rx="8"
+        />
+        <text
+          class="rw-context-title"
+          x={CONTEXT.x + CONTEXT.w / 2}
+          y={CONTEXT.y + 27}
+          text-anchor="middle"
+        >
+          context
+        </text>
+        <text
+          class="rw-context-line"
+          data-context-line
+          x={CONTEXT.x + CONTEXT.w / 2}
+          y={CONTEXT.y + 50}
+          text-anchor="middle"
+        >
+          {s0.context}
+        </text>
+      </g>
+
+      {TOOLS.map((t) => (
+        <g
+          class="rw-tool"
+          data-tool={t.id}
+          data-active={s0.fire?.[0] === t.id ? "true" : "false"}
+        >
+          <rect
+            class="rw-tool-box"
+            x={t.x}
+            y={t.y}
+            width={TOOL_W}
+            height={TOOL_H}
+            rx="6"
+          />
+          <text
+            class="rw-tool-label"
+            x={t.x + TOOL_W / 2}
+            y={t.cy + 5}
+            text-anchor="middle"
+          >
+            {t.label}
+          </text>
+        </g>
+      ))}
+
+      {FILES.map((f) => {
+        const [c, tst] = s0.files[f.id];
+        return (
+          <g
+            class="rw-file"
+            data-file={f.id}
+            data-active={s0.fire?.[1] === f.id ? "true" : "false"}
+            aria-label={fileSummary(f.label, c, tst)}
+          >
+            <rect
+              class="rw-file-box"
+              x={f.x}
+              y={f.y}
+              width={FILE_W}
+              height={FILE_H}
+              rx="8"
+            />
+            <text
+              class="rw-file-label"
+              x={f.x + FILE_W / 2}
+              y={f.y + 26}
+              text-anchor="middle"
+            >
+              {f.label}
+            </text>
+            <g class="rw-chip" data-chip="compile" data-status={c}>
+              <rect x={f.x + 15} y={f.y + 46} width="90" height="24" rx="12" />
+              <text x={f.x + 15 + 45} y={f.y + 46 + 16} text-anchor="middle">
+                {`compiles ${SYMBOL[c]}`}
+              </text>
+            </g>
+            <g class="rw-chip" data-chip="test" data-status={tst}>
+              <rect x={f.x + 115} y={f.y + 46} width="90" height="24" rx="12" />
+              <text x={f.x + 115 + 45} y={f.y + 46 + 16} text-anchor="middle">
+                {`tests ${SYMBOL[tst]}`}
+              </text>
+            </g>
+          </g>
+        );
+      })}
+    </svg>
+  </div>
+
+  <div class="rw-controls">
+    <button type="button" class="rw-btn" data-prev disabled>
+      Prev
+    </button>
+    <span class="rw-step-count" data-step-count>
+      Baseline
+    </span>
+    <button type="button" class="rw-btn" data-next>
+      Next
+    </button>
+  </div>
+
+  <div class="rw-readout" aria-live="polite">
+    <p class="rw-action" data-action set:html={s0.actionHtml} />
+    <p class="rw-cost" data-cost>
+      {s0.costLabel}
+    </p>
+    <p class="rw-note" data-note>
+      {s0.note}
+    </p>
+    <p class="rw-verdict" data-verdict>
+      {" "}
+    </p>
+  </div>
+
+  <figcaption>
+    Plan A and Plan B rolled forward one action at a time. Nothing was executed
+    — every ✓, ? and ✗ is the world model's prediction, and the cost is the cost
+    head's estimate. Plan A is the cheaper rollout, and the one that loses: its
+    terminal graph comes back with the test node red. The wiring never changes
+    across either rollout; only the features sitting on the nodes do.
+  </figcaption>
+</figure>
+
+<style>
+  .rw-edge {
+    stroke: var(--muted);
+    stroke-width: 1;
+    opacity: 0.35;
+    transition:
+      stroke var(--dur-fast) var(--ease-out),
+      stroke-width var(--dur-fast) var(--ease-out),
+      opacity var(--dur-fast) var(--ease-out);
+  }
+
+  .rw-edge[data-active="true"] {
+    stroke: var(--ink);
+    stroke-width: 2;
+    opacity: 1;
+  }
+
+  .rw-spine,
+  .rw-stub {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.25;
+    opacity: 0.6;
+  }
+
+  .rw-dep {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.25;
+    opacity: 0.6;
+  }
+
+  .rw-dep-label {
+    font-family: var(--font-body);
+    font-style: italic;
+    font-size: 11px;
+    fill: var(--muted);
+  }
+
+  .rw-context-box {
+    fill: var(--canvas-raised);
+    stroke: var(--ink);
+    stroke-width: 1.5;
+  }
+
+  .rw-context-title {
+    font-family: var(--font-body);
+    font-size: 15px;
+    fill: var(--ink);
+  }
+
+  .rw-context-line {
+    font-family: var(--font-body);
+    font-style: italic;
+    font-size: 12px;
+    fill: var(--muted);
+  }
+
+  .rw-tool-box {
+    fill: var(--canvas-raised);
+    stroke: var(--ink);
+    stroke-width: 1.5;
+    transition: stroke var(--dur-fast) var(--ease-out);
+  }
+
+  .rw-tool[data-active="true"] .rw-tool-box {
+    stroke: var(--ink);
+    stroke-width: 2.5;
+  }
+
+  .rw-tool-label {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    fill: var(--ink);
+  }
+
+  .rw-file-box {
+    fill: var(--canvas-raised);
+    stroke: var(--ink);
+    stroke-width: 1.5;
+    transition: stroke var(--dur-fast) var(--ease-out);
+  }
+
+  .rw-file[data-active="true"] .rw-file-box {
+    stroke: var(--ink);
+    stroke-width: 2.5;
+  }
+
+  .rw-file-label {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    fill: var(--ink);
+  }
+
+  .rw-chip rect {
+    fill: var(--canvas);
+    stroke: var(--ink);
+    stroke-width: 1.25;
+    transition:
+      fill var(--dur-fast) var(--ease-out),
+      stroke var(--dur-fast) var(--ease-out);
+  }
+
+  .rw-chip[data-status="ok"] rect {
+    fill: color-mix(in srgb, var(--ok) 12%, transparent);
+    stroke: var(--ok);
+  }
+
+  .rw-chip[data-status="unknown"] rect {
+    fill: color-mix(in srgb, var(--warn) 12%, transparent);
+    stroke: var(--warn);
+  }
+
+  .rw-chip[data-status="bad"] rect {
+    fill: color-mix(in srgb, var(--bad) 12%, transparent);
+    stroke: var(--bad);
+  }
+
+  .rw-chip text {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    fill: var(--ink);
+    text-anchor: middle;
+  }
+
+  .rw-chip[data-status="ok"] text {
+    fill: var(--ok);
+  }
+
+  .rw-chip[data-status="unknown"] text {
+    fill: var(--warn);
+  }
+
+  .rw-chip[data-status="bad"] text {
+    fill: var(--bad);
+  }
+
+  .rw-arrow-head {
+    fill: var(--ink);
+  }
+
+  .rw-arrow-head-muted {
+    fill: var(--muted);
+  }
+
+  /* Prose.astro styles every p, ul and li in an article at (0,2,1), so the
+     text rules below carry a .rollout-slides prefix to outrank it - same
+     trick as GridSim.astro. */
+
+  .rollout-slides .rw-plans {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2xs);
+    margin-bottom: var(--space-s);
+  }
+
+  .rw-plan-btn {
+    font: inherit;
+    font-size: var(--step--1);
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 0.4em 0.9em;
+    cursor: pointer;
+    transition: border-color var(--dur-fast) var(--ease-out);
+  }
+
+  .rw-plan-btn:hover {
+    border-color: var(--ink);
+  }
+
+  .rw-plan-btn[aria-pressed="true"] {
+    color: var(--accent-ink);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .rollout-slides .rw-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-s);
+    margin-top: var(--space-s);
+  }
+
+  .rw-btn {
+    font: inherit;
+    font-size: var(--step--1);
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 0.3em 0.8em;
+    cursor: pointer;
+    transition:
+      border-color var(--dur-fast) var(--ease-out),
+      transform var(--dur-instant) var(--ease-out);
+  }
+
+  .rw-btn:hover:not(:disabled) {
+    border-color: var(--ink);
+  }
+
+  .rw-btn:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  .rw-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .rollout-slides .rw-step-count {
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    color: var(--muted);
+    min-width: 8em;
+    text-align: center;
+  }
+
+  .rw-readout {
+    margin-top: var(--space-s);
+    padding: var(--space-xs) var(--space-s);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--canvas-raised);
+    text-align: center;
+  }
+
+  .rollout-slides .rw-action {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--step-0);
+  }
+
+  .rollout-slides .rw-cost {
+    margin: var(--space-3xs) 0 0;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--step--1);
+    color: var(--muted);
+  }
+
+  .rollout-slides .rw-note {
+    margin: var(--space-2xs) 0 0;
+    font-size: var(--step--1);
+    line-height: 1.5;
+    /* Longest note (step 7) wraps to three lines at Prose's --measure (~68ch) - reserved here, on the element that actually varies, not on the whole readout. */
+    min-height: calc(3 * 1.5 * var(--step--1));
+  }
+
+  .rollout-slides .rw-verdict {
+    margin: var(--space-2xs) 0 0;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: var(--step--1);
+    /* Always in flow so its line stays reserved - invisible rather than absent, via visibility, so it drops off the accessibility tree and is never announced on steps with no verdict. */
+    visibility: hidden;
+  }
+
+  .rw-verdict[data-status] {
+    visibility: visible;
+  }
+
+  .rw-verdict[data-status="ok"] {
+    color: var(--ok);
+  }
+
+  .rw-verdict[data-status="bad"] {
+    color: var(--bad);
+  }
+</style>
+
+<script>
+  interface StepData {
+    actionHtml: string;
+    fire: [string, string] | null;
+    files: Record<string, [string, string]>;
+    context: string;
+    note: string;
+    costLabel: string;
+    verdict: { text: string; status: string } | null;
+  }
+
+  const SYMBOL: Record<string, string> = { ok: "✓", unknown: "?", bad: "✗" };
+  const WORD: Record<string, string> = {
+    ok: "yes",
+    unknown: "unknown",
+    bad: "no",
+  };
+  const FILE_LABEL: Record<string, string> = {
+    format: "format.py",
+    cli: "cli.py",
+    test_cli: "test_cli.py",
+  };
+
+  function init() {
+    document
+      .querySelectorAll<HTMLElement>("[data-rollout]:not([data-ready])")
+      .forEach((root) => {
+        root.dataset.ready = "";
+        const plans = JSON.parse(root.dataset.plans!) as Record<
+          string,
+          StepData[]
+        >;
+        const defaultPlan = root.dataset.defaultPlan!;
+        const reduceMotion = matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+
+        const edges = [...root.querySelectorAll<SVGLineElement>("[data-edge]")];
+        const tools = [...root.querySelectorAll<SVGGElement>("[data-tool]")];
+        const files = [...root.querySelectorAll<SVGGElement>("[data-file]")];
+        const contextLine = root.querySelector("[data-context-line]")!;
+        const actionEl = root.querySelector("[data-action]")!;
+        const costEl = root.querySelector("[data-cost]")!;
+        const noteEl = root.querySelector("[data-note]")!;
+        const verdictEl = root.querySelector<HTMLElement>("[data-verdict]")!;
+        const stepCount = root.querySelector("[data-step-count]")!;
+        const prevBtn = root.querySelector<HTMLButtonElement>("[data-prev]")!;
+        const nextBtn = root.querySelector<HTMLButtonElement>("[data-next]")!;
+        const planButtons = [
+          ...root.querySelectorAll<HTMLButtonElement>("[data-plan-btn]"),
+        ];
+
+        // Short fade for the text that swaps between slides - the SVG
+        // already transitions its own fills/strokes via CSS. Skipped
+        // entirely under reduced motion, since .animate() isn't touched by
+        // global.css's blanket transition-duration override.
+        const fade = (el: Element) => {
+          if (reduceMotion) return;
+          el.animate([{ opacity: 0 }, { opacity: 1 }], {
+            duration: 170, // --dur-fast
+            easing: "cubic-bezier(0.22, 0.61, 0.36, 1)", // --ease-out
+          });
+        };
+
+        let plan = defaultPlan;
+        let idx = 0;
+
+        function render() {
+          const steps = plans[plan];
+          const step = steps[idx];
+
+          for (const el of edges) {
+            el.removeAttribute("data-active");
+            el.removeAttribute("marker-end");
+          }
+          if (step.fire) {
+            const active = root.querySelector<SVGLineElement>(
+              `[data-edge="${step.fire[0]}-${step.fire[1]}"]`,
+            );
+            active?.setAttribute("data-active", "true");
+            active?.setAttribute("marker-end", "url(#rw-arrow)");
+          }
+
+          for (const el of tools) {
+            el.dataset.active = String(
+              !!step.fire && step.fire[0] === el.dataset.tool,
+            );
+          }
+
+          for (const el of files) {
+            const id = el.dataset.file!;
+            const [c, t] = step.files[id];
+            const compileChip = el.querySelector<SVGGElement>(
+              '[data-chip="compile"]',
+            )!;
+            const testChip =
+              el.querySelector<SVGGElement>('[data-chip="test"]')!;
+            compileChip.dataset.status = c;
+            compileChip.querySelector("text")!.textContent =
+              `compiles ${SYMBOL[c]}`;
+            testChip.dataset.status = t;
+            testChip.querySelector("text")!.textContent = `tests ${SYMBOL[t]}`;
+            el.dataset.active = String(!!step.fire && step.fire[1] === id);
+            el.setAttribute(
+              "aria-label",
+              `${FILE_LABEL[id]}: compiles ${WORD[c]}, tests ${WORD[t]}`,
+            );
+          }
+
+          contextLine.textContent = step.context;
+          // actionHtml is build-time KaTeX markup baked in by this file's
+          // own frontmatter for a fixed, small set of labels - never user
+          // input - so innerHTML here is safe.
+          actionEl.innerHTML = step.actionHtml;
+          costEl.textContent = step.costLabel;
+          noteEl.textContent = step.note;
+
+          if (step.verdict) {
+            verdictEl.dataset.status = step.verdict.status;
+            verdictEl.textContent = step.verdict.text;
+          } else {
+            verdictEl.removeAttribute("data-status");
+            verdictEl.textContent = " ";
+          }
+
+          for (const el of [actionEl, costEl, noteEl, contextLine]) fade(el);
+
+          stepCount.textContent =
+            idx === 0 ? "Baseline" : `Step ${idx} of ${steps.length - 1}`;
+          prevBtn.disabled = idx === 0;
+          nextBtn.disabled = idx === steps.length - 1;
+        }
+
+        prevBtn.addEventListener("click", () => {
+          if (idx > 0) {
+            idx--;
+            render();
+          }
+        });
+        nextBtn.addEventListener("click", () => {
+          if (idx < plans[plan].length - 1) {
+            idx++;
+            render();
+          }
+        });
+
+        for (const btn of planButtons) {
+          btn.addEventListener("click", () => {
+            const next = btn.dataset.planBtn!;
+            if (next === plan) return;
+            plan = next;
+            idx = 0;
+            for (const b of planButtons)
+              b.setAttribute("aria-pressed", String(b === btn));
+            render();
+          });
+        }
+      });
+  }
+
+  // astro:page-load fires on first load and after every ClientRouter
+  // navigation - same pattern as GridSim.astro.
+  document.addEventListener("astro:page-load", init);
+</script>

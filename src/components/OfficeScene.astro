@@ -1,0 +1,747 @@
+---
+// Scroll-driven hero: a full-bleed illustrated home-office scene that dollies
+// toward the monitor as the page scrolls, with the tagline overlaid on the
+// scene from the first frame (not waiting for a separate "content phase").
+// See src/assets/scene/README.md for the source-of-truth measurements this
+// component's constants are built from (focal points, headroom limits).
+import { Image } from 'astro:assets';
+import dayImg from '../assets/scene/office-day.png';
+import nightImg from '../assets/scene/office-night.png';
+import { site } from '../config';
+---
+
+<section class="scene" data-scene>
+  <div class="scene__stage">
+    <div
+      class="scene__plane"
+      role="img"
+      aria-label="An illustrated home office: a desk with a monitor, a pinboard on the wall, and a window with plants."
+    >
+      <Image
+        src={dayImg}
+        alt=""
+        class="scene__img scene__img--day"
+        widths={[640, 960, 1280, 1536]}
+        sizes="100vw"
+        format="webp"
+        loading="eager"
+      />
+      <Image
+        src={nightImg}
+        alt=""
+        class="scene__img scene__img--night"
+        widths={[640, 960, 1280, 1536]}
+        sizes="100vw"
+        format="webp"
+        loading="eager"
+      />
+    </div>
+    <div class="scene__glow" aria-hidden="true"></div>
+    <canvas class="scene__particles" data-particles aria-hidden="true"></canvas>
+    <div class="scene__vignette" aria-hidden="true"></div>
+    <div class="scene__grain" aria-hidden="true"></div>
+    <div class="scene__recede" aria-hidden="true"></div>
+    <div class="scene__scrim" aria-hidden="true"></div>
+    <div class="scene__content">
+      <p class="scene__tagline">{site.description}</p>
+    </div>
+    <div class="scene__reveal">
+      <div class="wrap"><slot /></div>
+    </div>
+    <div class="scene__cue" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Module scope: attached once, survives ClientRouter swaps (Astro dedupes
+  // identical module scripts, so this body runs a single time per session).
+  // initParticles() looks up elements fresh every call, so there's nothing
+  // stale to hold onto across a page-load's DOM swap.
+
+  // --- scroll-driven dolly: target vs. rendered value ------------------
+  // The old update() wrote --p straight from the scroll offset inside a
+  // rAF-throttled handler. A wheel notch delivers ~100px at once, so --p
+  // landed in discrete steps and every consumer (dolly, tilt, overlay
+  // fades) snapped with it - nothing interpolated between notches, which
+  // read as a plain scroll with a zoom bolted on rather than a camera move.
+  // Fix: pTarget tracks the raw scroll offset, pRender eases toward it every
+  // frame in the rAF loop below - the same target/render split GSAP's
+  // `scrub` uses under the hood.
+  let pTarget = 0;
+  let pRender = 0;
+  let needsEase = true; // true while draw() still owes an easing step + --p write
+
+  const EASE_K = 0.12;   // pRender closes ~63% of the gap to pTarget per ~139ms frame
+  const EASE_EPS = 5e-4; // settle threshold - half the precision --p is written at (toFixed(4))
+  const pz = (v: number) => 1 - (1 - v) * (1 - v); // ease-out; only the dolly reads this (see .scene__plane)
+
+  function computeTarget() {
+    const scene = document.querySelector<HTMLElement>('[data-scene]');
+    if (!scene) return;
+    const r = scene.getBoundingClientRect();
+    const total = r.height - window.innerHeight;
+    pTarget = total > 0 ? Math.min(1, Math.max(0, -r.top / total)) : 0;
+  }
+
+  // Snap straight to the target, skipping the ease: used on first load and
+  // whenever the hero re-enters the viewport, so scrolling back to the top
+  // never eases up from a stale value left over from before it scrolled away.
+  function snapToTarget() {
+    computeTarget();
+    pRender = pTarget;
+    needsEase = false;
+    const scene = document.querySelector<HTMLElement>('[data-scene]');
+    scene?.style.setProperty('--p', pRender.toFixed(4));
+    scene?.style.setProperty('--pz', pz(pRender).toFixed(4));
+  }
+
+  let ticking = false;
+  function onScroll() {
+    // Cheap: recompute the target and flag that the rAF loop owes an
+    // easing pass. No style write happens here - draw() below does that.
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      computeTarget();
+      needsEase = true;
+      ticking = false;
+    });
+  }
+
+  // --- pointer tilt ------------------------------------------------------
+  // A few degrees of rotation that follow the cursor, eased the same way as
+  // the dolly and summed into .scene__plane's scroll-driven rotation in CSS.
+  // --tilt-px / --tilt-py (in the stylesheet) are the max-degree constants;
+  // --ptr-x / --ptr-y below are the eased, normalised [-1, 1] pointer
+  // position CSS multiplies them by.
+  let tiltXTarget = 0;
+  let tiltYTarget = 0;
+  let tiltXRender = 0;
+  let tiltYRender = 0;
+  let tiltActive = false;
+  const TILT_K = 0.08;
+  const finePointer = matchMedia('(pointer: fine)').matches; // touch devices never attach the listener
+
+  // Ambient particle field: a few dozen dust motes (day) or firefly specks
+  // (night), drifting independent of scroll. Cheap on purpose: one canvas,
+  // tens of points, rAF paused via IntersectionObserver whenever the hero
+  // is off-screen so it isn't burning battery on a blog post further down.
+  //
+  // This is also the single rAF loop for the whole component: the same
+  // draw() call that animates particles also drives the scroll-ease and the
+  // pointer-tilt-ease, so there is only ever one requestAnimationFrame chain
+  // running for the hero, gated on hero visibility.
+  let teardownParticles: (() => void) | null = null;
+
+  function initParticles() {
+    teardownParticles?.();
+    teardownParticles = null;
+
+    const scene = document.querySelector<HTMLElement>('[data-scene]');
+    const canvas = scene?.querySelector<HTMLCanvasElement>('[data-particles]');
+    const stage = scene?.querySelector<HTMLElement>('.scene__stage');
+    if (!scene || !canvas || !stage) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let particles: { x: number; y: number; r: number; vx: number; vy: number; a: number; phase: number }[] = [];
+    let isDark = false;
+    let running = false;
+    let rafId = 0;
+
+    function resize() {
+      const rect = canvas!.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas!.width = rect.width * dpr;
+      canvas!.height = rect.height * dpr;
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // Read theme off the same three-state cascade that drives --focus-y,
+      // rather than re-deriving light/dark logic separately in JS.
+      isDark = getComputedStyle(scene!).getPropertyValue('--is-dark').trim() === '1';
+      seed(rect.width, rect.height);
+    }
+
+    function seed(w: number, h: number) {
+      const count = 34;
+      particles = Array.from({ length: count }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: isDark ? 0.6 + Math.random() * 1.6 : 0.5 + Math.random() * 1.1,
+        vx: (Math.random() - 0.5) * (isDark ? 0.05 : 0.035),
+        vy: -0.015 - Math.random() * (isDark ? 0.045 : 0.03),
+        a: 0.15 + Math.random() * (isDark ? 0.55 : 0.3),
+        phase: Math.random() * Math.PI * 2,
+      }));
+    }
+
+    function draw(t: number) {
+      const rect = canvas!.getBoundingClientRect();
+      ctx!.clearRect(0, 0, rect.width, rect.height);
+      const rgb = isDark ? '255, 196, 120' : '255, 250, 238';
+      for (const pt of particles) {
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        if (pt.x < 0) pt.x = rect.width;
+        if (pt.x > rect.width) pt.x = 0;
+        if (pt.y < -4) {
+          pt.y = rect.height + 4;
+          pt.x = Math.random() * rect.width;
+        }
+        const twinkle = 0.7 + 0.3 * Math.sin(t / 900 + pt.phase);
+        ctx!.beginPath();
+        ctx!.fillStyle = `rgba(${rgb}, ${(pt.a * twinkle).toFixed(3)})`;
+        ctx!.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+        ctx!.fill();
+      }
+
+      // Scroll ease: short-circuits once pRender has caught up to pTarget
+      // and no scroll has landed since (needsEase only flips back to true
+      // from onScroll) - so this stops writing --p on a static page instead
+      // of spinning forever, even though the rAF loop itself keeps running
+      // below for particles.
+      if (needsEase) {
+        pRender += (pTarget - pRender) * EASE_K;
+        if (Math.abs(pTarget - pRender) < EASE_EPS) {
+          pRender = pTarget; // snap the last <0.0005 away rather than sit off-target
+          needsEase = false;
+        }
+        scene!.style.setProperty('--p', pRender.toFixed(4));
+        scene!.style.setProperty('--pz', pz(pRender).toFixed(4));
+      }
+
+      // Pointer tilt ease: same idle pattern. Only runs at all on a fine
+      // pointer - finePointer also gates the listeners that set it below.
+      if (finePointer && tiltActive) {
+        tiltXRender += (tiltXTarget - tiltXRender) * TILT_K;
+        tiltYRender += (tiltYTarget - tiltYRender) * TILT_K;
+        if (Math.abs(tiltXTarget - tiltXRender) < EASE_EPS && Math.abs(tiltYTarget - tiltYRender) < EASE_EPS) {
+          tiltXRender = tiltXTarget;
+          tiltYRender = tiltYTarget;
+          tiltActive = false;
+        }
+        scene!.style.setProperty('--ptr-x', tiltXRender.toFixed(4));
+        scene!.style.setProperty('--ptr-y', tiltYRender.toFixed(4));
+      }
+
+      if (running) rafId = requestAnimationFrame(draw);
+    }
+
+    function start() {
+      if (running) return;
+      running = true;
+      snapToTarget(); // resume from the live scroll position, not a stale eased value
+      rafId = requestAnimationFrame(draw);
+    }
+    function stop() {
+      running = false;
+      cancelAnimationFrame(rafId);
+    }
+
+    resize();
+    const onResize = () => resize();
+    window.addEventListener('resize', onResize, { passive: true });
+
+    let onPointerMove: ((e: PointerEvent) => void) | null = null;
+    let onPointerLeave: (() => void) | null = null;
+    if (finePointer) {
+      onPointerMove = (e: PointerEvent) => {
+        const rect = stage.getBoundingClientRect();
+        tiltXTarget = Math.min(1, Math.max(-1, ((e.clientX - rect.left) / rect.width - 0.5) * 2));
+        tiltYTarget = Math.min(1, Math.max(-1, ((e.clientY - rect.top) / rect.height - 0.5) * 2));
+        tiltActive = true;
+      };
+      onPointerLeave = () => {
+        tiltXTarget = 0;
+        tiltYTarget = 0;
+        tiltActive = true; // keep easing until it settles back to 0
+      };
+      stage.addEventListener('pointermove', onPointerMove, { passive: true });
+      stage.addEventListener('pointerleave', onPointerLeave, { passive: true });
+    }
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) start();
+          else stop();
+        }
+      },
+      { threshold: 0 }
+    );
+    io.observe(scene);
+
+    teardownParticles = () => {
+      stop();
+      io.disconnect();
+      window.removeEventListener('resize', onResize);
+      if (onPointerMove) stage.removeEventListener('pointermove', onPointerMove);
+      if (onPointerLeave) stage.removeEventListener('pointerleave', onPointerLeave);
+    };
+  }
+
+  // Reduced motion: never attach the scroll driver, pointer tilt, or the
+  // particle loop. CSS alone collapses the effect to a static image (see
+  // the component's prefers-reduced-motion block) and --p/--pz are simply
+  // never set.
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    document.addEventListener('astro:page-load', () => {
+      snapToTarget();
+      initParticles();
+    });
+  }
+</script>
+
+<style>
+  .scene {
+    /* --- tunable constants: camera move --- */
+    --tilt-y: -4deg;       /* Y rotation at scroll start (p=0) - small, reads as "settling" not "tilted card" */
+    --tilt-x: 1.5deg;      /* X rotation at scroll start (p=0) */
+    --tilt-fade: 0.5;      /* p at which residual tilt has fully resolved to 0 */
+    /* Dolly is a real translateZ, not scale() - under perspective they're
+       equivalent for a single flat plane. Apparent magnification of a plane
+       at z=0 after a dolly of D is F = perspective / (perspective - D). The
+       camera needs to travel until the monitor glass fills the frame. This
+       asset (1086x724, aspect 1.5) is width-bound under cover-fit at a
+       1440x900 viewport (100% of asset width visible, 93.8% of height), and
+       the glass is 10.4% of asset width, so filling the frame needs
+       1.0 / 0.104 ~= 9.6x, not a height-based estimate.
+       Derivation: the dissolve begins at p=0.80 (--recede-start), where
+       --pz = 1-(1-0.8)^2 = 0.96, so D = 1300 * 0.96 = 1248, giving
+       F = 1400/(1400-1248) = 1400/152 ~= 9.2x - fills the frame with the
+       glass right as the dissolve starts.
+       GUARD THE SINGULARITY: F diverges as D -> 1400px (the perspective
+       distance). At --dolly-end:1300px and --pz:1 (full scroll), F = 14x -
+       large but finite, and fully hidden by .scene__recede's dissolve by
+       then. --dolly-end must stay meaningfully below 1400px or the plane
+       reaches the camera and magnification goes infinite/negative. Do not
+       raise this past 1350px. */
+    --dolly-end: 1340px;
+    --runway: 320vh;       /* scroll distance the whole move plays out over - long enough that a move this large doesn't feel rushed */
+    --plane-overscan: 6%;  /* plane oversized on all sides so the small rotation never exposes an edge; cover-fit math keeps the visible crop identical (see component notes) - checked against the deeper dolly above, still sufficient since pointer tilt is damped toward 0 as the dolly deepens (see --ptr-x/--ptr-y damping below) */
+    --tilt-px: 2.5deg;     /* max Y-axis pointer tilt, summed into the scroll rotation below */
+    --tilt-py: 1.5deg;     /* max X-axis pointer tilt */
+
+    /* --- tunable constants: overlay content --- */
+    --content-fade: 0.35;  /* p at which the tagline has fully faded out - earlier than before since the runway is longer, so the tagline still clears well ahead of the dolly getting deep */
+    --content-drift: -2.5rem; /* upward drift of the tagline as p advances */
+    /* p at which the dissolve-to-canvas starts, tuned by screenshot so the
+       screen is already dominating the frame before the fade begins, and
+       finishes (0.90, see .scene__recede) before the upscale blur becomes
+       objectionable. See .scene__recede. */
+    --recede-start: 0.80;
+    --cue-fade: 0.15;      /* p at which the scroll cue is fully gone */
+    /* p at which the vignette/grain overlays are fully gone, same clamp
+       shape as --content-fade but on its own schedule (0.35 is tuned for
+       the tagline's shorter on-screen life; the vignette/grain need to
+       hang around long enough not to vanish before the tagline itself is
+       gone, but must be clear well before --recede-start=0.80 or the
+       mid-zoom frame reads as a dark oval spotlight instead of a plain
+       dissolve). */
+    --overlay-fade: 0.6;
+    /* p range the slotted About-page reveal content fades in over, once
+       the dolly has the camera essentially inside the screen and the
+       recede dissolve is most of the way to opaque canvas (see
+       .scene__reveal) - ends comfortably before the runway does. */
+    --reveal-start: 0.88;
+    --reveal-end: 0.98;
+
+    /* --- theme-dependent: flip below, day values are the default --- */
+    --focus-x: 41.8%;      /* monitor-glass focal centre, x (comparable across themes) */
+    --focus-y: 51.0%;      /* monitor-glass focal centre, y (day). Measured off a gridded crop: glass spans 44.5-57.5%. The night asset draws the same monitor ~2.6% higher (41.8-55.0%), so it gets its own value in the dark blocks below - one shared midpoint would sit 1.3% off centre in BOTH themes and cost 20% of the vertical room the dolly has to work with. x matches (41.7%) so --focus-x stays shared. */
+
+    /* Same focal point expressed as a fraction of the STAGE. .scene__plane is
+       inset by -6% on every side, and object-position percentages put the
+       asset point at exactly that fraction of the plane box, so an asset
+       fraction f lands at f * 1.12 - 6% of the stage. perspective-origin and
+       the overlay gradients below are stage fractions; without this the dolly
+       converges 14px right of the monitor at 1440px wide, and that error
+       magnifies ~9x by the end of the zoom - which is what pulled the
+       convergence off the screen and onto the wall behind it.
+       1.12 = 1 + 2 * --plane-overscan; keep in step if that changes. */
+    --focus-sx: calc(var(--focus-x) * 1.12 - var(--plane-overscan));
+    --focus-sy: calc(var(--focus-y) * 1.12 - var(--plane-overscan));
+    --lamp-x: 30.5%;       /* desk lamp centre (night only - lamp is off/absent in the day illustration) */
+    --lamp-y: 34%;
+    --lamp-glow-o: 0;      /* lamp glow strength - 0 in day, lit in dark theme below */
+    --monitor-glow-o: 0.3; /* monitor glow strength - present in both themes */
+    --is-dark: 0;          /* read by the particle script to choose dust vs firefly palette */
+
+    position: relative;
+    height: var(--runway);
+    /* full-bleed breakout from the parent .wrap, guarded against the
+       horizontal-scrollbar overflow the naive 100vw idiom causes */
+    width: 100vw;
+    margin-inline: calc(50% - 50vw);
+    overflow-x: clip;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme="light"])) .scene {
+      --lamp-glow-o: 0.55;
+      --is-dark: 1;
+      --focus-y: 48.4%;  /* night monitor sits ~2.6% higher than day - see --focus-y above */
+    }
+  }
+
+  :global(:root[data-theme="dark"]) .scene {
+    --lamp-glow-o: 0.55;
+    --is-dark: 1;
+    --focus-y: 48.4%;  /* night monitor sits ~2.6% higher than day - see --focus-y above */
+  }
+
+  .scene__stage {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow: hidden;
+    perspective: 1400px;
+    /* Defaults to 50% 50% (stage centre), which would splay the dolly away
+       from the monitor it's converging on. Anchor it at the same focal
+       point the plane rotates/zooms around instead. */
+    perspective-origin: var(--focus-sx) var(--focus-sy);
+  }
+
+  .scene__plane {
+    position: absolute;
+    inset: calc(-1 * var(--plane-overscan));
+    transform-origin: var(--focus-x) var(--focus-y);
+    transform-style: preserve-3d;
+    /* translateZ FIRST, then the rotations: this dollies in unrotated view
+       space and rotates about the translated origin, which is correct.
+       Rotating first would translate along a rotated (wrong) axis.
+       --pz is an eased value (1 - (1-p)^2) so the dolly ramps out instead of
+       accelerating - F(D) = perspective/(perspective-D) is convex in D, so a
+       linear ramp on a raw p would visibly speed up as it goes. Every other
+       consumer (tilt fade, content, recede, cue) keeps reading the raw
+       linear --p; only the dolly reads --pz.
+       Pointer tilt (--tilt-px/--tilt-py * --ptr-x/--ptr-y) is summed into
+       the same rotateY/rotateX terms as the scroll-driven tilt, not a
+       separate transform - it composes with the scroll rotation instead of
+       fighting it. Its contribution is also multiplied by (1 - --p): at the
+       ~9x dolly above, the old full-strength 2.5deg pointer tilt would
+       throw the magnified image around violently once deep into the zoom,
+       so it decays linearly to 0 as the scroll advances - full-strength at
+       rest, gone by the time the camera is inside the screen. Reads raw
+       --p, not --pz, same as the tilt-fade term above. */
+    transform:
+      translateZ(calc(var(--dolly-end) * var(--pz, 0)))
+      rotateY(calc(
+        var(--tilt-y) * clamp(0, (var(--tilt-fade) - var(--p, 0)) / var(--tilt-fade), 1)
+        + var(--tilt-px) * var(--ptr-x, 0) * (1 - var(--p, 0))
+      ))
+      rotateX(calc(
+        var(--tilt-x) * clamp(0, (var(--tilt-fade) - var(--p, 0)) / var(--tilt-fade), 1)
+        + var(--tilt-py) * var(--ptr-y, 0) * (1 - var(--p, 0))
+      ));
+    will-change: transform;
+  }
+
+  .scene__img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: var(--focus-x) var(--focus-y);
+    /* Must not swallow pointer-tilt events - the stage listens for them. */
+    pointer-events: none;
+    /* Both images stay in the accessibility tree now (see .scene__plane's
+       role="img"/aria-label, and alt="" on both <Image>s below) so this can
+       cross-dissolve on an opacity transition instead of the instant
+       display:none cut - the two illustrations are never pixel-identical. */
+    transition: opacity var(--dur-slow) var(--ease-in-out);
+  }
+
+  .scene__img--day {
+    opacity: 1;
+  }
+
+  .scene__img--night {
+    opacity: 0;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme="light"])) .scene__img--day {
+      opacity: 0;
+    }
+    :global(:root:not([data-theme="light"])) .scene__img--night {
+      opacity: 1;
+    }
+  }
+
+  :global(:root[data-theme="dark"]) .scene__img--day {
+    opacity: 0;
+  }
+  :global(:root[data-theme="dark"]) .scene__img--night {
+    opacity: 1;
+  }
+
+  /* Ambient light: a soft glow at the lamp (night only) and the monitor
+     (both themes), pulsing gently. Colours below are approximate screen-
+     glow / lamp-light hues sampled from the illustrations, not tokens. */
+  .scene__glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    background:
+      radial-gradient(circle at var(--lamp-x) var(--lamp-y), rgb(255 190 110 / var(--lamp-glow-o)) 0%, transparent 22%),
+      radial-gradient(circle at var(--focus-sx) var(--focus-sy), rgb(160 210 255 / var(--monitor-glow-o)) 0%, transparent 20%);
+    /* 11s = 0.09Hz, clear of the 0.167Hz (6s) band that's a documented
+       motion-sensitivity trigger for full-viewport brightness oscillation.
+       Floor raised 0.7 -> 0.84 to halve the peak-to-peak luminance swing,
+       which a slower duration alone doesn't fix. */
+    animation: scene-glow-pulse 11s var(--ease-in-out) infinite;
+  }
+
+  @keyframes scene-glow-pulse {
+    0%, 100% { opacity: 0.84; }
+    50% { opacity: 1; }
+  }
+
+  .scene__particles {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  /* Static heavy vignette - unifies the scene, pushes it toward cinematic.
+     Fades out with the scroll (see --overlay-fade) so it clears well before
+     .scene__recede starts dissolving the scene to --canvas - left at full
+     strength it reads as a dark oval spotlight sitting on top of the
+     dissolve instead of a plain fade to a blank frame. */
+  .scene__vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: clamp(0, 1 - var(--p, 0) / var(--overlay-fade), 1);
+    /* scrim neutral, not palette */
+    background: radial-gradient(ellipse at var(--focus-sx) var(--focus-sy), transparent 35%, rgb(0 0 0 / 0.55) 100%);
+  }
+
+  /* Light film grain, static texture (not animated - cheap, still reads as
+     unifying texture rather than a flat digital render). Fades out on the
+     same schedule as the vignette above, for the same reason - scales the
+     base 0.05 opacity rather than driving the element to opacity:1. */
+  .scene__grain {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: calc(0.05 * clamp(0, 1 - var(--p, 0) / var(--overlay-fade), 1));
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 160px 160px;
+  }
+
+  /* Scroll-driven dissolve to the page background. The dolly above pushes
+     the monitor glass to ~9x magnification on a 1086px-wide asset, which
+     goes visibly blurry well before the zoom completes - so instead of
+     leaving that blurry image on screen, the whole scene fades to
+     var(--canvas) before the blur becomes objectionable, which reads as
+     "the monitor screen becoming the page" rather than a low-res image,
+     since the glass colour and --canvas are already near-identical in both
+     themes (see src/assets/scene/README.md edge-colour measurements).
+     Reaches fully opaque at p=0.90 (not 1.0), comfortably before the
+     runway ends, so .about-grid scrolls up onto a matching solid colour
+     with no visible seam. */
+  .scene__recede {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: var(--canvas);
+    opacity: clamp(0, (var(--p, 0) - var(--recede-start)) / (0.90 - var(--recede-start)), 1);
+  }
+
+  /* Top-down scrim guaranteeing the overlaid tagline stays legible against
+     both the bright day wall and the dark night scene. Neutral scrim, not
+     palette - see component report for measured contrast ratios. Its whole
+     job is tagline legibility, so it fades out on the same schedule as
+     .scene__content (--content-fade) - otherwise this dark gradient would
+     sit on top of .scene__recede's opaque --canvas fade and tint what's
+     supposed to read as a clean flat colour once the tagline is long gone. */
+  .scene__scrim {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: clamp(0, 1 - var(--p, 0) / var(--content-fade), 1);
+    background: linear-gradient(
+      to bottom,
+      rgb(10 12 8 / 0.88) 0%,
+      rgb(10 12 8 / 0.78) 25%,
+      rgb(10 12 8 / 0.4) 48%,
+      transparent 68%
+    );
+  }
+
+  .scene__content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-start;
+    padding: var(--space-2xl) var(--space-xl);
+    opacity: clamp(0, 1 - var(--p, 0) / var(--content-fade), 1);
+    transform: translateY(calc(var(--p, 0) / var(--content-fade) * var(--content-drift)));
+    pointer-events: none;
+  }
+
+  .scene__tagline {
+    /* Fixed light colour, not a design token: tokens flip per theme and
+       this must not - the scrim above is what guarantees contrast in both
+       themes (see component report for measured ratios). */
+    color: #F5F3EC;
+    font-family: var(--font-display);
+    font-size: var(--step-4);
+    letter-spacing: var(--tracking-4);
+    line-height: 1.1;
+    max-width: 22ch;
+    text-shadow: 0 2px 18px rgb(0 0 0 / 0.35);
+  }
+
+  @media (max-width: 768px) {
+    .scene__content {
+      padding: var(--space-xl) var(--space-m);
+    }
+
+    .scene__tagline {
+      font-size: var(--step-3);
+      /* Tracking follows size down: --step-3 pairs with --tracking-3. */
+      letter-spacing: var(--tracking-3);
+      max-width: 18ch;
+    }
+  }
+
+  /* Slotted reveal content (the About-page heading/intro): arrives on the
+     blank --canvas the scene has dissolved to, not on the illustration, so
+     unlike .scene__tagline above it uses the normal --ink body colour
+     rather than the fixed light colour the tagline needs for legibility
+     over the dark scrim. Positioned the same way as .scene__content
+     (absolute, inset 0) but centred rather than top-aligned, and
+     constrained to the site's normal .wrap measure/padding so it lines up
+     with the page content below instead of sprawling full-bleed. Fades in
+     over --reveal-start -> --reveal-end, once the recede dissolve is most
+     of the way to opaque canvas (see --recede-start) and well before the
+     runway ends, so .about-grid takes over with no visible gap of blank
+     scrolling. Inert by default (nothing to click before it's on screen);
+     any link inside re-enables itself via .scene__reveal :global(a) below. */
+  .scene__reveal {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    padding-block: var(--space-2xl);
+    opacity: clamp(0, (var(--p, 0) - var(--reveal-start)) / (var(--reveal-end) - var(--reveal-start)), 1);
+    pointer-events: none;
+  }
+
+  .scene__reveal .wrap {
+    width: 100%;
+  }
+
+  .scene__reveal :global(a) {
+    pointer-events: auto;
+  }
+
+  .scene__cue {
+    position: absolute;
+    left: 50%;
+    bottom: var(--space-xl);
+    transform: translateX(-50%);
+    color: #F5F3EC;
+    opacity: clamp(0, 1 - var(--p, 0) / var(--cue-fade), 1);
+    pointer-events: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scene {
+      height: auto;
+    }
+
+    /* Drop out of the sticky/absolute stack entirely: .scene__stage and
+       .scene__plane go back to normal flow, and .scene__img (static,
+       height: auto) carries the intrinsic image height that gives
+       .scene__stage a real height - the overlay layers (still absolute)
+       anchor to that instead of collapsing to zero. */
+    .scene__stage {
+      position: relative;
+      height: auto;
+      perspective: none;
+    }
+
+    .scene__plane {
+      position: static;
+      inset: auto;
+      transform: none;
+    }
+
+    .scene__img {
+      position: static;
+      width: 100%;
+      height: auto;
+      object-fit: cover;
+    }
+
+    /* The opacity crossfade (above) can't drop a static-flow image out of
+       layout - with position:static both images are display:block and
+       would stack top-to-bottom, doubling .scene__stage's height with a
+       blank gap where the invisible one sits. There's no motion playing
+       here anyway, so fall back to display:none on the inactive image,
+       same as the pre-crossfade behaviour. */
+    .scene__img--night {
+      display: none;
+    }
+
+    :global(:root[data-theme="dark"]) .scene__img--day {
+      display: none;
+    }
+    :global(:root[data-theme="dark"]) .scene__img--night {
+      display: block;
+    }
+
+    .scene__glow {
+      animation: none;
+    }
+
+    .scene__particles,
+    .scene__cue {
+      display: none;
+    }
+
+    .scene__content {
+      opacity: 1;
+      transform: none;
+    }
+
+    /* No scroll, no dolly, no dissolve - --p is never set, so the base
+       opacity expression above (which reads var(--p, 0)) would otherwise
+       default to invisible. Also drop out of the absolute-overlay stack:
+       left as inset:0 it would sit directly on top of .scene__content's
+       tagline (both fully opaque, both real text) rather than the blank
+       canvas it's designed to fade onto. Static places it in normal flow
+       right after .scene__plane's real-height image - i.e. directly below
+       the hero, immediately visible with no extra scrolling, which is the
+       reduced-motion equivalent of "faded in by the end of the zoom". */
+    .scene__reveal {
+      position: static;
+      inset: auto;
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) and (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme="light"])) .scene__img--day {
+      display: none;
+    }
+    :global(:root:not([data-theme="light"])) .scene__img--night {
+      display: block;
+    }
+  }
+</style>

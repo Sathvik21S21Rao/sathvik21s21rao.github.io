@@ -1,0 +1,154 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import BaseLayout from './BaseLayout.astro';
+import MarginRail from '../components/MarginRail.astro';
+import RelatedPosts from '../components/RelatedPosts.astro';
+import Giscus from '../components/Giscus.astro';
+
+type Post = CollectionEntry<'blog'>;
+
+interface Props {
+  post: Post;
+  related: Post[];
+  backlinks: { slug: string; title: string }[];
+  sideTracks?: { slug: string; title: string }[];
+  parentLink?: { slug: string; title: string } | null;
+  readingTime: string;
+}
+
+const { post, related, backlinks, sideTracks = [], parentLink = null, readingTime } = Astro.props;
+const cover = post.data.cover;
+---
+
+<BaseLayout title={post.data.title} description={post.data.blurb} ogType="article">
+  <article class="post">
+    <div class="post__grid">
+      <header class="post__header">
+        {cover && (
+          <img
+            class="post__cover"
+            src={cover.src}
+            alt={cover.alt}
+            loading="eager"
+          />
+        )}
+        <h1 class="post__title">{post.data.title}</h1>
+        <p class="post__standfirst">{post.data.blurb}</p>
+      </header>
+
+      <MarginRail
+        post={post}
+        readingTime={readingTime}
+        backlinks={backlinks}
+        sideTracks={sideTracks}
+        parentLink={parentLink}
+      />
+
+      <div class="post__content">
+        <slot />
+      </div>
+    </div>
+
+    <div class="post__after">
+      <RelatedPosts posts={related} />
+      <Giscus />
+    </div>
+  </article>
+</BaseLayout>
+
+<style>
+  .post {
+    padding-block: var(--space-xl) var(--space-3xl);
+  }
+
+  /* One grid for the whole page: title row and content row share the same
+     rail/content columns, so the title sits over the content column instead
+     of being centred as its own, differently-sized block. */
+  .post__grid {
+    display: grid;
+    grid-template-columns: var(--rail) minmax(0, var(--measure));
+    column-gap: var(--space-xl);
+    row-gap: var(--space-xl);
+  }
+
+  .post__header {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .post__cover {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: var(--radius);
+    margin-bottom: var(--space-l);
+  }
+
+  .post__title {
+    font-family: var(--font-display);
+    font-size: var(--step-4);
+    line-height: 1.1;
+  }
+
+  .post__standfirst {
+    margin-top: var(--space-s);
+    color: var(--muted);
+    font-size: var(--step-1);
+  }
+
+  /* Rail spans both rows so it can stay sticky the full length of the
+     article, not just alongside the title. */
+  .post__grid > :global(.margin-rail) {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    position: sticky;
+    top: var(--space-l);
+    align-self: start;
+  }
+
+  .post__content {
+    grid-column: 2;
+    grid-row: 2;
+    /* A grid item defaults to min-width: auto, so anything with a floor width
+       inside it - a diagram, a wide table, a long code line - stretches the
+       whole column past the viewport instead of scrolling in its own box, and
+       body's overflow-x: clip then silently cuts the right side off. */
+    min-width: 0;
+  }
+
+  .post__after {
+    max-width: var(--measure);
+    margin-inline: auto;
+  }
+
+  @media (max-width: 900px) {
+    .post__grid {
+      grid-template-columns: 1fr;
+      row-gap: var(--space-l);
+    }
+
+    .post__header,
+    .post__content {
+      grid-column: 1;
+      grid-row: auto;
+    }
+
+    .post__header {
+      order: 0;
+    }
+
+    .post__content {
+      order: 2;
+    }
+
+    .post__grid > :global(.margin-rail) {
+      grid-column: 1;
+      grid-row: auto;
+      order: 1;
+      position: static;
+      padding-bottom: var(--space-m);
+      border-bottom: 1px solid var(--rule);
+    }
+  }
+</style>
