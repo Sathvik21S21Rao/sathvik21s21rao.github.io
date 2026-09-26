@@ -151,8 +151,12 @@ a:focus-visible {
 }
 
 /* Theme-aware cover images - same selectors as tokens.css's manual
-   [data-theme] toggle override of prefers-color-scheme. */
-.only-dark {
+   [data-theme] toggle override of prefers-color-scheme. The :root:not(...)
+   prefix raises specificity to beat Astro's scoped .post__cover { display:
+   block } rule (which gets a scoping attribute selector bumping it to
+   (0,2,0)); a bare .only-dark { display: none } at (0,1,0) loses that fight
+   and both covers show stacked in light mode. */
+:root:not([data-theme="dark"]) .only-dark {
   display: none;
 }
 
