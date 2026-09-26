@@ -19,7 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # action@v3 defaults to Node 20, below the engines floor in package.json
       - uses: withastro/action@v3
+        with:
+          node-version: 22
 
   deploy:
     needs: build
