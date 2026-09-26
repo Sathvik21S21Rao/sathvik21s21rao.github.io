@@ -1,8 +1,8 @@
 ---
-import type { CollectionEntry } from 'astro:content';
-import TagPill from './TagPill.astro';
+import type { CollectionEntry } from "astro:content";
+import TagPill from "./TagPill.astro";
 
-type Post = CollectionEntry<'blog'>;
+type Post = CollectionEntry<"blog">;
 
 interface Props {
   posts: Post[];
@@ -11,7 +11,10 @@ interface Props {
 
 const { posts, groupByYear = false } = Astro.props;
 
-const dateFmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+const dateFmt = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
 
 // Group newest-first posts by year, preserving order.
 const groups: { year: number; posts: Post[] }[] = [];
@@ -43,18 +46,33 @@ const leadPost = groupByYear ? groups[0]?.posts[0] : undefined;
         </div>
         <div class="year-content">
           {gi === 0 && leadPost && (
-            <article class={`lead ${leadPost.data.cover ? '' : 'lead--text'}`}>
+            <article class={`lead ${leadPost.data.cover ? "" : "lead--text"}`}>
               {leadPost.data.cover && (
                 <img
-                  class="lead__cover"
+                  class={
+                    leadPost.data.cover.srcDark
+                      ? "lead__cover only-light"
+                      : "lead__cover"
+                  }
                   src={leadPost.data.cover.src}
                   alt={leadPost.data.cover.alt}
                   width="1600"
                   height="900"
                 />
               )}
+              {leadPost.data.cover && leadPost.data.cover.srcDark && (
+                <img
+                  class="lead__cover only-dark"
+                  src={leadPost.data.cover.srcDark}
+                  alt={leadPost.data.cover.alt}
+                  width="1600"
+                  height="900"
+                />
+              )}
               <div class="lead__body">
-                <span class="lead__date">{dateFmt.format(leadPost.data.date)}</span>
+                <span class="lead__date">
+                  {dateFmt.format(leadPost.data.date)}
+                </span>
                 <a class="lead__title-link" href={`/blog/${leadPost.id}/`}>
                   <h2 class="lead__title">{leadPost.data.title}</h2>
                 </a>
@@ -69,14 +87,17 @@ const leadPost = groupByYear ? groups[0]?.posts[0] : undefined;
               </div>
             </article>
           )}
-          {group.posts.filter((_, pi) => !(gi === 0 && pi === 0)).length > 0 && (
+          {group.posts.filter((_, pi) => !(gi === 0 && pi === 0)).length >
+            0 && (
             <ul class="rows">
               {group.posts
                 .filter((_, pi) => !(gi === 0 && pi === 0))
                 .map((post) => (
                   <li class="row">
                     <div class="row__inner">
-                      <span class="row__date">{dateFmt.format(post.data.date)}</span>
+                      <span class="row__date">
+                        {dateFmt.format(post.data.date)}
+                      </span>
                       <div class="row__body">
                         <a class="row__title-link" href={`/blog/${post.id}/`}>
                           <span class="row__title">{post.data.title}</span>
@@ -113,7 +134,9 @@ const leadPost = groupByYear ? groups[0]?.posts[0] : undefined;
                 accessible name — it renders on top of .row__title-link::after
                 (the full-row click overlay) since that's a positioned,
                 z-indexed element and this isn't, so it stays visible. */}
-            {post.data.parent && <span class="row__sidetrack-badge">Side track</span>}
+            {post.data.parent && (
+              <span class="row__sidetrack-badge">Side track</span>
+            )}
             <p class="row__blurb">{post.data.blurb}</p>
             {post.data.tags.length > 0 && (
               <div class="row__tags">
@@ -198,7 +221,7 @@ const leadPost = groupByYear ? groups[0]?.posts[0] : undefined;
   }
 
   .lead__title-link::after {
-    content: '';
+    content: "";
     position: absolute;
     inset: 0;
     z-index: 1;
@@ -257,10 +280,11 @@ const leadPost = groupByYear ? groups[0]?.posts[0] : undefined;
     position: relative;
     border-bottom: 1px solid var(--rule);
     /* Reveal only. The stagger below is set as an inline transition-delay by
-       the script, and inline styles outrank everything - so the hover lift
-       lives on .row__inner, out of that delay's reach. */
-    transition: transform var(--dur-slow) var(--ease-out),
-                opacity var(--dur-slow) var(--ease-out);
+         the script, and inline styles outrank everything - so the hover lift
+         lives on .row__inner, out of that delay's reach. */
+    transition:
+      transform var(--dur-slow) var(--ease-out),
+      opacity var(--dur-slow) var(--ease-out);
   }
 
   .row.js-pre {
@@ -315,7 +339,7 @@ const leadPost = groupByYear ? groups[0]?.posts[0] : undefined;
   }
 
   .row__title-link::after {
-    content: '';
+    content: "";
     position: absolute;
     inset: 0;
     z-index: 1;
@@ -380,7 +404,7 @@ const leadPost = groupByYear ? groups[0]?.posts[0] : undefined;
     .year-marker__num {
       font-size: var(--step-2);
       /* Tracking follows size down, and --step-2 is below where tightening is
-         worth anything. */
+             worth anything. */
       letter-spacing: normal;
     }
 
@@ -401,27 +425,27 @@ const leadPost = groupByYear ? groups[0]?.posts[0] : undefined;
 
 <script is:inline data-astro-rerun>
   (function () {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    var rows = document.querySelectorAll('.row');
+    var rows = document.querySelectorAll(".row");
     if (!rows.length) return;
 
     rows.forEach(function (row, i) {
-      row.classList.add('js-pre');
-      row.style.transitionDelay = Math.min(i * 24, 200) + 'ms';
+      row.classList.add("js-pre");
+      row.style.transitionDelay = Math.min(i * 24, 200) + "ms";
     });
 
     var observer = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (entry) {
           if (entry.isIntersecting) {
-            entry.target.classList.remove('js-pre');
-            entry.target.classList.add('js-visible');
+            entry.target.classList.remove("js-pre");
+            entry.target.classList.add("js-visible");
             observer.unobserve(entry.target);
           }
         });
       },
-      { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
+      { threshold: 0.1, rootMargin: "0px 0px -40px 0px" },
     );
 
     rows.forEach(function (row) {

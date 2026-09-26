@@ -4,13 +4,17 @@ date: 2026-09-20
 blurb: "Your brain runs simulations before it acts. That is all a world model is and most of the systems worth simulating are things connected to other things, which is what a graph is for."
 tags: ["world-models", "graphs", "machine-learning", "agents"]
 draft: false
+cover:
+  src: "/blog/graph-world-models/cover-light.png"
+  srcDark: "/blog/graph-world-models/cover-dark.png"
+  alt: "A walking robot figure feeding into a directed graph of states, with one highlighted path of amber edges showing the planned transitions."
 ---
 
-import Term from '../../components/Term.astro';
-import HoverGif from '../../components/HoverGif.astro';
-import GridSim from '../../components/GridSim.astro';
-import WorldModelLoop from '../../assets/blog/graph-world-models/world-model-loop.svg';
-import PlanScoring from '../../assets/blog/graph-world-models/plan-scoring.svg';
+import Term from "../../components/Term.astro";
+import HoverGif from "../../components/HoverGif.astro";
+import GridSim from "../../components/GridSim.astro";
+import WorldModelLoop from "../../assets/blog/graph-world-models/world-model-loop.svg";
+import PlanScoring from "../../assets/blog/graph-world-models/plan-scoring.svg";
 
 Our tiny human brains have built a model of the world. Or Stephen Covey would like to call it a "map" of the world. They run little simulations: what happens if I do this, what happens if I do that, then pick whichever one ends best and act on it. You have never touched a kettle boiling at 100 degrees, and you never will. <HoverGif src="/blog/graph-world-models/bruh.gif" alt="Mike Wazowski's face swapped onto Sully's body, staring blankly, captioned 'BRUH'.">Like bruh</HoverGif>, it is "common sense".
 
@@ -29,7 +33,12 @@ In that instant your brain did the following:
 
 <figure class="figure-diagram">
   <WorldModelLoop />
-  <figcaption>The four steps as a loop: (1) process what you see, (2) understand it, (3) imagine what each action would lead to, (4) take the best one for real. Redrawn after the diagram in Ha &amp; Schmidhuber's 2018 <em>World Models</em>.</figcaption>
+  <figcaption>
+    The four steps as a loop: (1) process what you see, (2) understand it, (3)
+    imagine what each action would lead to, (4) take the best one for real.
+    Redrawn after the diagram in Ha &amp; Schmidhuber's 2018{" "}
+    <em>World Models</em>.
+  </figcaption>
 </figure>
 
 That is what a world model does:
@@ -43,7 +52,7 @@ It is that simple.
 
 The best use case for this is simulation. Stick with the car. Testing a self-driving controller by physically driving it around would <HoverGif src="/blog/graph-world-models/empty-wallet.gif" alt="Two hands prising open an empty wallet, finding nothing inside.">break the bank</HoverGif>, and honestly it is not even feasible. So instead: let the controller generate the actions, and let the world model play those actions out in its own idea of the environment. Suddenly you can run far more experiments, safely.
 
-But can the simulation itself be wrong? A world model is a learned guess at the physics, and a car that is safe inside a model which misunderstands the lanes on a road is not a safe car (ain't even safe in GTA). That constrains the whole idea. Where a world model earns its keep is the *first ten thousand* tests: you spend cheap imagined runs throwing out the obviously bad ideas, and save the expensive real ones for the few that survive. Confirming the car is actually safe still happens in reality. How far you can trust the model is something you have to measure.
+But can the simulation itself be wrong? A world model is a learned guess at the physics, and a car that is safe inside a model which misunderstands the lanes on a road is not a safe car (ain't even safe in GTA). That constrains the whole idea. Where a world model earns its keep is the _first ten thousand_ tests: you spend cheap imagined runs throwing out the obviously bad ideas, and save the expensive real ones for the few that survive. Confirming the car is actually safe still happens in reality. How far you can trust the model is something you have to measure.
 
 My favourite use case is very relevant to where agentic AI is heading right now. An agent proposes a plan, a series of tool calls, and today the only way to find out whether that plan was any good is to run it. That is expensive, unless you are a die-hard fan of token maxxing. Tokens burn, files get written, real API calls go out, and if the plan was bad you find out at the end.
 
@@ -53,7 +62,11 @@ I work this through properly in [[graph-world-models-case-study|a side track on 
 
 <figure class="figure-diagram">
   <PlanScoring />
-  <figcaption>Checking plans before running them. The world model imagines all three, the one that misses the goal is thrown away, and only the cheapest plan that still works is done for real.</figcaption>
+  <figcaption>
+    Checking plans before running them. The world model imagines all three, the
+    one that misses the goal is thrown away, and only the cheapest plan that
+    still works is done for real.
+  </figcaption>
 </figure>
 
 The agentic environment simulation source is [Qwen-AgentWorld](https://arxiv.org/abs/2606.24597). In that paper, language world models are trained to generate or simulate the responses of an operating system, the web, MCP servers and so on.
@@ -92,5 +105,5 @@ If you want to go deeper, the 2018 world models paper is the right place to star
 
 ## References
 
-1. David Ha and Jürgen Schmidhuber. *World Models*. 2018. [arXiv:1803.10122](https://arxiv.org/abs/1803.10122)
-2. Yuxin Zuo, Zikai Xiao, Li Sheng, et al. *Qwen-AgentWorld: Language World Models for General Agents*. 2026. [arXiv:2606.24597](https://arxiv.org/abs/2606.24597)
+1. David Ha and Jürgen Schmidhuber. _World Models_. 2018. [arXiv:1803.10122](https://arxiv.org/abs/1803.10122)
+2. Yuxin Zuo, Zikai Xiao, Li Sheng, et al. _Qwen-AgentWorld: Language World Models for General Agents_. 2026. [arXiv:2606.24597](https://arxiv.org/abs/2606.24597)

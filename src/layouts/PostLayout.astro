@@ -1,11 +1,11 @@
 ---
-import type { CollectionEntry } from 'astro:content';
-import BaseLayout from './BaseLayout.astro';
-import MarginRail from '../components/MarginRail.astro';
-import RelatedPosts from '../components/RelatedPosts.astro';
-import Giscus from '../components/Giscus.astro';
+import type { CollectionEntry } from "astro:content";
+import BaseLayout from "./BaseLayout.astro";
+import MarginRail from "../components/MarginRail.astro";
+import RelatedPosts from "../components/RelatedPosts.astro";
+import Giscus from "../components/Giscus.astro";
 
-type Post = CollectionEntry<'blog'>;
+type Post = CollectionEntry<"blog">;
 
 interface Props {
   post: Post;
@@ -16,18 +16,37 @@ interface Props {
   readingTime: string;
 }
 
-const { post, related, backlinks, sideTracks = [], parentLink = null, readingTime } = Astro.props;
+const {
+  post,
+  related,
+  backlinks,
+  sideTracks = [],
+  parentLink = null,
+  readingTime,
+} = Astro.props;
 const cover = post.data.cover;
 ---
 
-<BaseLayout title={post.data.title} description={post.data.blurb} ogType="article">
+<BaseLayout
+  title={post.data.title}
+  description={post.data.blurb}
+  ogType="article"
+>
   <article class="post">
     <div class="post__grid">
       <header class="post__header">
         {cover && (
           <img
-            class="post__cover"
+            class={cover.srcDark ? "post__cover only-light" : "post__cover"}
             src={cover.src}
+            alt={cover.alt}
+            loading="eager"
+          />
+        )}
+        {cover && cover.srcDark && (
+          <img
+            class="post__cover only-dark"
+            src={cover.srcDark}
             alt={cover.alt}
             loading="eager"
           />
@@ -111,9 +130,9 @@ const cover = post.data.cover;
     grid-column: 2;
     grid-row: 2;
     /* A grid item defaults to min-width: auto, so anything with a floor width
-       inside it - a diagram, a wide table, a long code line - stretches the
-       whole column past the viewport instead of scrolling in its own box, and
-       body's overflow-x: clip then silently cuts the right side off. */
+         inside it - a diagram, a wide table, a long code line - stretches the
+         whole column past the viewport instead of scrolling in its own box, and
+         body's overflow-x: clip then silently cuts the right side off. */
     min-width: 0;
   }
 

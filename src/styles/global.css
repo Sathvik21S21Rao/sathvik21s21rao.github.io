@@ -1,7 +1,9 @@
-@import './tokens.css';
+@import "./tokens.css";
 
 /* Reset / normalize */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -14,20 +16,34 @@ html {
   text-size-adjust: 100%;
 }
 
-img, picture, video, canvas, svg {
+img,
+picture,
+video,
+canvas,
+svg {
   display: block;
   max-width: 100%;
 }
 
-input, button, textarea, select {
+input,
+button,
+textarea,
+select {
   font: inherit;
 }
 
-p, h1, h2, h3, h4, h5, h6 {
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   overflow-wrap: break-word;
 }
 
-#root, #__next {
+#root,
+#__next {
   isolation: isolate;
 }
 
@@ -54,11 +70,18 @@ body {
   font-family: var(--font-body);
   font-size: var(--step-0);
   line-height: 1.7;
-  font-feature-settings: 'kern' 1, 'liga' 1;
+  font-feature-settings:
+    "kern" 1,
+    "liga" 1;
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-display);
   color: var(--ink);
   line-height: 1.15;
@@ -73,14 +96,19 @@ h1 {
   letter-spacing: var(--tracking-4);
 }
 
-code, pre, kbd, samp {
+code,
+pre,
+kbd,
+samp {
   font-family: var(--font-mono);
 }
 
 /* Young Serif ships no italic cut - anything emphasised inside display type,
    or any italic that resolves against the display stack, falls back to the
    body serif (which has a real italic) instead of a browser-faked oblique. */
-em, i, cite {
+em,
+i,
+cite {
   font-family: var(--font-body);
   font-style: italic;
 }
@@ -122,11 +150,37 @@ a:focus-visible {
   padding-inline: clamp(1.25rem, 5vw, 3rem);
 }
 
+/* Theme-aware cover images - same selectors as tokens.css's manual
+   [data-theme] toggle override of prefers-color-scheme. */
+.only-dark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .only-dark {
+    display: block;
+  }
+
+  :root:not([data-theme="light"]) .only-light {
+    display: none;
+  }
+}
+
+:root[data-theme="dark"] .only-dark {
+  display: block;
+}
+
+:root[data-theme="dark"] .only-light {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: .01ms !important;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
+    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
 }
