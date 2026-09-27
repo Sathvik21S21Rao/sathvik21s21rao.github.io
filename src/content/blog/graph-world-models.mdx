@@ -69,9 +69,7 @@ I work this through properly in [[graph-world-models-case-study|a side track on 
   </figcaption>
 </figure>
 
-The agentic environment simulation source is [Qwen-AgentWorld](https://arxiv.org/abs/2606.24597). In that paper, language world models are trained to generate or simulate the responses of an operating system, the web, MCP servers and so on.
-
-And none of this is specific to cars. Any field that is bottlenecked on running physical experiments gets faster the moment you can run those experiments in a model first.
+And none of this is specific to cars or agents. Any field that is bottlenecked on running physical experiments gets faster the moment you can run those experiments in a model first.
 
 ## Why talk about graph world models then?
 
@@ -85,7 +83,7 @@ Take a power grid. It has substations and generators joined by physical lines. I
 
 In most cases, we do know how different entities in the world interact. Instead of the model inferring the interactions during training, the input state can itself contain them. So there is nothing fancy about graph world models, it is a world model whose input and output involve graphs.
 
-If you want the notation — the transition function, the two paradigms of fixed and dynamic edges, and where the training objective actually comes from — that lives in [[graph-world-models-technicalities|a side track on the technicalities]]. It is still being written; nothing below needs it.
+If you want the notation — the transition function, the two paradigms of fixed and dynamic edges, and where the training objective actually comes from — that lives in [[graph-world-models-technicalities|a side track on the technicalities]]. Nothing below needs it.
 
 ## Limitations of GWMs
 
@@ -107,3 +105,6 @@ If you want to go deeper, the 2018 world models paper is the right place to star
 
 1. David Ha and Jürgen Schmidhuber. _World Models_. 2018. [arXiv:1803.10122](https://arxiv.org/abs/1803.10122)
 2. Yuxin Zuo, Zikai Xiao, Li Sheng, et al. _Qwen-AgentWorld: Language World Models for General Agents_. 2026. [arXiv:2606.24597](https://arxiv.org/abs/2606.24597)
+3. Ziying Song, Caiyan Jia, Lin Liu, et al. _GraphWorld: Long-Horizon Planning with World Models for End-to-End Autonomous Driving_. 2026. [arXiv:2606.16274](https://arxiv.org/abs/2606.16274)
+4. Xinyuan Song and Zekun Cai. _Understanding Rollout Error in Graph World Models_. 2026. [arXiv:2606.27780](https://arxiv.org/abs/2606.27780)
+5. Zhongyi Zhou and Ruofei Du. _ToolGrad: Efficient Tool-use Dataset Generation with Textual "Gradients"_. ACL 2026. [arXiv:2508.04086](https://arxiv.org/abs/2508.04086)

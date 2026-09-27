@@ -17,7 +17,7 @@
     "@astrojs/sitemap": "^3.7.3",
     "@tabler/icons": "^3.46.0",
     "astro": "^7.2.3",
-    "katex": "^0.18.9",
+    "katex": "^0.16.47",
     "rehype-katex": "^7.0.1",
     "remark-math": "^6.0.0"
   },

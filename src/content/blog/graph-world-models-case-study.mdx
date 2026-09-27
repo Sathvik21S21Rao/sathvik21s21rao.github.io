@@ -5,6 +5,10 @@ blurb: "Instead of simulating the environment an agent acts on, simulate the exe
 tags: ["world-models", "graphs", "agents"]
 draft: false
 parent: graph-world-models
+cover:
+  src: "/blog/graph-world-models/case-study-cover-light.png"
+  srcDark: "/blog/graph-world-models/case-study-cover-dark.png"
+  alt: "A graph of agent, cloud database, app and user nodes, with a diamond of amber edges linking three agents and a central database to mark the plan being scored."
 ---
 
 import RolloutSlides from "../../components/RolloutSlides.astro";
@@ -62,8 +66,3 @@ The answer is amortization. You pay the execution cost once, up front, on a corp
 [ToolGrad](https://research.google/blog/toolgrad-efficient-tool-use-dataset-generation-with-textual-gradients/) could find an interesting use case here. Essentially, another problem is that to generate traces we need to define the tasks or prompts first, and then evaluate the traces to see whether they solved the user query optimally. But ToolGrad automates this by performing the tool operations first and then relating those tool calls back to user prompts.
 
 The catch is that the model is only trustworthy where those traces were dense. A GWM trained on Python repositories will be confidently wrong about a Rust build. That is a real constraint on the idea.
-
-## References
-
-1. Yuxin Zuo, Zikai Xiao, Li Sheng, et al. _Qwen-AgentWorld: Language World Models for General Agents_. 2026. [arXiv:2606.24597](https://arxiv.org/abs/2606.24597)
-2. Zhongyi Zhou and Ruofei Du. _ToolGrad: Efficient Tool-use Dataset Generation with Textual "Gradients"_. ACL 2026. [arXiv:2508.04086](https://arxiv.org/abs/2508.04086)

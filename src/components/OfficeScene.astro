@@ -78,12 +78,23 @@ import { site } from '../config';
   const EASE_K = 0.12;   // pRender closes ~63% of the gap to pTarget per ~139ms frame
   const EASE_EPS = 5e-4; // settle threshold - half the precision --p is written at (toFixed(4))
   const pz = (v: number) => 1 - (1 - v) * (1 - v); // ease-out; only the dolly reads this (see .scene__plane)
+  // Magnification a translateZ dolly of D = DOLLY_END * pz would give under
+  // PERSPECTIVE: F = P / (P - D). Applied as a 2D scale() instead of a real
+  // translateZ - identical for one flat plane, but phone GPUs drop or freeze a
+  // 3D layer pushed to within 60px of the camera, which is what stopped the
+  // zoom on mobile. Keep in step with the stage's perspective.
+  const PERSPECTIVE = 1400;
+  const DOLLY_END = 1340; // must stay below PERSPECTIVE - F diverges at D = P
+  const zoom = (v: number) => PERSPECTIVE / (PERSPECTIVE - DOLLY_END * pz(v));
 
   function computeTarget() {
     const scene = document.querySelector<HTMLElement>('[data-scene]');
     if (!scene) return;
     const r = scene.getBoundingClientRect();
-    const total = r.height - window.innerHeight;
+    // The sticky stage's own height, not innerHeight: a phone's toolbar
+    // collapsing mid-scroll changes innerHeight and made --p jump.
+    const stage = scene.querySelector<HTMLElement>('.scene__stage');
+    const total = r.height - (stage?.offsetHeight ?? window.innerHeight);
     pTarget = total > 0 ? Math.min(1, Math.max(0, -r.top / total)) : 0;
   }
 
@@ -96,7 +107,7 @@ import { site } from '../config';
     needsEase = false;
     const scene = document.querySelector<HTMLElement>('[data-scene]');
     scene?.style.setProperty('--p', pRender.toFixed(4));
-    scene?.style.setProperty('--pz', pz(pRender).toFixed(4));
+    scene?.style.setProperty('--zoom', zoom(pRender).toFixed(4));
   }
 
   let ticking = false;
@@ -156,8 +167,8 @@ import { site } from '../config';
     function resize() {
       const rect = canvas!.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas!.width = rect.width * dpr;
-      canvas!.height = rect.height * dpr;
+      canvas!.width = Math.round(rect.width * dpr);
+      canvas!.height = Math.round(rect.height * dpr);
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       // Read theme off the same three-state cascade that drives --focus-y,
       // rather than re-deriving light/dark logic separately in JS.
@@ -210,7 +221,7 @@ import { site } from '../config';
           needsEase = false;
         }
         scene!.style.setProperty('--p', pRender.toFixed(4));
-        scene!.style.setProperty('--pz', pz(pRender).toFixed(4));
+        scene!.style.setProperty('--zoom', zoom(pRender).toFixed(4));
       }
 
       // Pointer tilt ease: same idle pattern. Only runs at all on a fine
@@ -242,7 +253,15 @@ import { site } from '../config';
     }
 
     resize();
-    const onResize = () => resize();
+    // Phones fire resize whenever the toolbar shows/hides; the canvas fills
+    // the lvh-tall stage so its size doesn't change - skip the realloc and
+    // reseed, which visibly reshuffled the particles mid-scroll.
+    const onResize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (canvas.width === Math.round(rect.width * dpr) && canvas.height === Math.round(rect.height * dpr)) return;
+      resize();
+    };
     window.addEventListener('resize', onResize, { passive: true });
 
     let onPointerMove: ((e: PointerEvent) => void) | null = null;
@@ -285,7 +304,7 @@ import { site } from '../config';
 
   // Reduced motion: never attach the scroll driver, pointer tilt, or the
   // particle loop. CSS alone collapses the effect to a static image (see
-  // the component's prefers-reduced-motion block) and --p/--pz are simply
+  // the component's prefers-reduced-motion block) and --p/--zoom are simply
   // never set.
   if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -303,7 +322,7 @@ import { site } from '../config';
     --tilt-y: -4deg;       /* Y rotation at scroll start (p=0) - small, reads as "settling" not "tilted card" */
     --tilt-x: 1.5deg;      /* X rotation at scroll start (p=0) */
     --tilt-fade: 0.5;      /* p at which residual tilt has fully resolved to 0 */
-    /* Dolly is a real translateZ, not scale() - under perspective they're
+    /* Dolly is scale(F), standing in for a translateZ - under perspective they're
        equivalent for a single flat plane. Apparent magnification of a plane
        at z=0 after a dolly of D is F = perspective / (perspective - D). The
        camera needs to travel until the monitor glass fills the frame. This
@@ -321,7 +340,7 @@ import { site } from '../config';
        then. --dolly-end must stay meaningfully below 1400px or the plane
        reaches the camera and magnification goes infinite/negative. Do not
        raise this past 1350px. */
-    --dolly-end: 1340px;
+    /* --dolly-end (1340px) now lives in the script as DOLLY_END, applied as scale(--zoom). */
     --runway: 320vh;       /* scroll distance the whole move plays out over - long enough that a move this large doesn't feel rushed */
     --plane-overscan: 6%;  /* plane oversized on all sides so the small rotation never exposes an edge; cover-fit math keeps the visible crop identical (see component notes) - checked against the deeper dolly above, still sufficient since pointer tilt is damped toward 0 as the dolly deepens (see --ptr-x/--ptr-y damping below) */
     --tilt-px: 2.5deg;     /* max Y-axis pointer tilt, summed into the scroll rotation below */
@@ -411,15 +430,14 @@ import { site } from '../config';
     position: absolute;
     inset: calc(-1 * var(--plane-overscan));
     transform-origin: var(--focus-x) var(--focus-y);
-    transform-style: preserve-3d;
-    /* translateZ FIRST, then the rotations: this dollies in unrotated view
-       space and rotates about the translated origin, which is correct.
-       Rotating first would translate along a rotated (wrong) axis.
-       --pz is an eased value (1 - (1-p)^2) so the dolly ramps out instead of
+    /* scale() FIRST, then the rotations: this zooms in unrotated view
+       space and rotates about the zoomed origin, which is correct.
+       Rotating first would zoom along a rotated (wrong) axis.
+       The dolly eases p through (1 - (1-p)^2) (pz in the script) so it ramps out instead of
        accelerating - F(D) = perspective/(perspective-D) is convex in D, so a
        linear ramp on a raw p would visibly speed up as it goes. Every other
        consumer (tilt fade, content, recede, cue) keeps reading the raw
-       linear --p; only the dolly reads --pz.
+       linear --p; only the dolly reads the eased value, via --zoom.
        Pointer tilt (--tilt-px/--tilt-py * --ptr-x/--ptr-y) is summed into
        the same rotateY/rotateX terms as the scroll-driven tilt, not a
        separate transform - it composes with the scroll rotation instead of
@@ -428,9 +446,9 @@ import { site } from '../config';
        throw the magnified image around violently once deep into the zoom,
        so it decays linearly to 0 as the scroll advances - full-strength at
        rest, gone by the time the camera is inside the screen. Reads raw
-       --p, not --pz, same as the tilt-fade term above. */
+       --p, not the eased value, same as the tilt-fade term above. */
     transform:
-      translateZ(calc(var(--dolly-end) * var(--pz, 0)))
+      scale(var(--zoom, 1))
       rotateY(calc(
         var(--tilt-y) * clamp(0, (var(--tilt-fade) - var(--p, 0)) / var(--tilt-fade), 1)
         + var(--tilt-px) * var(--ptr-x, 0) * (1 - var(--p, 0))
