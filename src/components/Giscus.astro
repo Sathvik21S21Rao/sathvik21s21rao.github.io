@@ -27,7 +27,7 @@ const enabled = Boolean(repo && repoId && categoryId);
       const dark = attr
         ? attr === "dark"
         : window.matchMedia("(prefers-color-scheme: dark)").matches;
-      return dark ? "dark_dim" : "light";
+      return dark ? "dark_dimmed" : "light";
     }
 
     function loadGiscus() {
@@ -58,7 +58,7 @@ const enabled = Boolean(repo && repoId && categoryId);
     function syncTheme(theme) {
       const iframe = document.querySelector("iframe.giscus-frame");
       if (!iframe || !iframe.contentWindow) return;
-      const mapped = theme === "dark" ? "dark_dim" : "light";
+      const mapped = theme === "dark" ? "dark_dimmed" : "light";
       iframe.contentWindow.postMessage(
         { giscus: { setConfig: { theme: mapped } } },
         "https://giscus.app",

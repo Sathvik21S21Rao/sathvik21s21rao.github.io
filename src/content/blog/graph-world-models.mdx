@@ -1,6 +1,6 @@
 ---
 title: "World Models, but the World Is a Graph"
-date: 2026-09-20
+date: 2026-10-03
 blurb: "Your brain runs simulations before it acts. That is all a world model is and most of the systems worth simulating are things connected to other things, which is what a graph is for."
 tags: ["world-models", "graphs", "machine-learning", "agents"]
 draft: false
@@ -69,6 +69,8 @@ I work this through properly in [[graph-world-models-case-study|a side track on 
   </figcaption>
 </figure>
 
+This isn't just a thought experiment either. [GAVEL](https://arxiv.org/abs/2609.19315), a paper from this September, does exactly this for robots working through long household tasks: a graph world model checks each step an LLM plans before it runs, repairs the mistakes it can fix on its own, and sends only the rest back to the LLM. With a small 8B model, task success went from about 41% to 92%.
+
 And none of this is specific to cars or agents. Any field that is bottlenecked on running physical experiments gets faster the moment you can run those experiments in a model first.
 
 ## Why talk about graph world models then?
@@ -108,3 +110,4 @@ If you want to go deeper, the 2018 world models paper is the right place to star
 3. Ziying Song, Caiyan Jia, Lin Liu, et al. _GraphWorld: Long-Horizon Planning with World Models for End-to-End Autonomous Driving_. 2026. [arXiv:2606.16274](https://arxiv.org/abs/2606.16274)
 4. Xinyuan Song and Zekun Cai. _Understanding Rollout Error in Graph World Models_. 2026. [arXiv:2606.27780](https://arxiv.org/abs/2606.27780)
 5. Zhongyi Zhou and Ruofei Du. _ToolGrad: Efficient Tool-use Dataset Generation with Textual "Gradients"_. ACL 2026. [arXiv:2508.04086](https://arxiv.org/abs/2508.04086)
+6. Ruiyang Wang, Hao-Lun Hsu, Swarajh Mehta, et al. _GAVEL: Graph World Models for Verified and Efficient Long-Horizon LLM Task Planning_. 2026. [arXiv:2609.19315](https://arxiv.org/abs/2609.19315)

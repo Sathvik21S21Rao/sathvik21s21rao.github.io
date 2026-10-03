@@ -1,11 +1,13 @@
 ---
 title: "Graph World Models: The Technicalities"
-date: 2026-09-20
+date: 2026-10-03
 blurb: "The notation behind graph world models: the transition function, fixed versus dynamic edges, and where the training objective comes from."
 tags: ["world-models", "graphs", "machine-learning"]
 draft: false
 parent: graph-world-models
 ---
+
+import HoverGif from "../../components/HoverGif.astro";
 
 As I said in [[graph-world-models|the main article]], a world model's functioning is very simple:
 
@@ -37,7 +39,7 @@ $$
 
 For the power grid below, that vector encodes something like *open breaker 7*. For the molecule example, *raise the temperature by 10K*. For the coding agent in [[graph-world-models-case-study|the case study]], it is a one-hot over which tool fired and which file it touched. The action does not have to be global. You can also inject it at a single node and let message passing carry the effect outward, which is closer to what the agentic case really does, but the global form is the one to keep in your head.
 
-<!-- MEDIA: figure — power grid (fixed edges) and molecule (dynamic edges). See docs/graph-world-models-media.md. -->
+{/* MEDIA: figure — power grid (fixed edges) and molecule (dynamic edges). See docs/graph-world-models-media.md. */}
 
 There are two paradigms of graph world models:
 1. Fixed edge GWMs
@@ -138,4 +140,4 @@ $$
 
 The gradient is just the residual, with nothing in a denominator, nothing that has to be kept positive, and nothing that explodes when the model gets confident.
 
-Identity covariance does cost you something, though. It asserts that every node is equally predictable and that every feature dimension shares one scale. Neither is true of a power grid: a voltage in kV and a load in MW have wildly different natural spreads, and an unscaled MSE will spend most of its capacity on whichever channel happens to have the largest units. So standardise the node features before training, because that assumption is doing real work. The other cost is that the model has no way to say *I don't know*. A substation with two hundred neighbours is genuinely harder to predict than one with two, and with $\Sigma = I$ the loss refuses to hear it. Letting the network predict a per-node variance is the natural upgrade, and it is the sort of upgrade that is better on paper and harder to train, so it is worth being sure you need it first.
+This was my attempt at actually understanding a simplistic model of training a GWM. The assumption of the covariance being an identity limits the training objective. It essentially implies that all node feature dimensions <HoverGif src="/blog/graph-world-models/wigglytuff.gif" alt="A Wigglytuff standing still and wobbling in place.">wiggle</HoverGif> in the same manner. This is not true for the power grid example itself: the temperature wiggles differently from the voltage or power. But the main point here was to get an intuition of what exactly we are optimizing in the model. Ideally, we would include the variance in the training objective itself.

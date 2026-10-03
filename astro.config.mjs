@@ -31,7 +31,7 @@ export default defineConfig({
   site: 'https://sathvik21s21rao.github.io',
   integrations: [mdx(), sitemap()],
   // ClientRouter turns prefetch on but defaults to 'hover', which spends the
-  // hover-intent budget before the request even starts. Four nav destinations
+  // hover-intent budget before the request even starts. Two nav destinations
   // and small HTML - just fetch what's on screen.
   prefetch: { prefetchAll: true, defaultStrategy: 'viewport' },
   markdown: {

@@ -3,6 +3,9 @@ import { site } from "../config";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import AboutIntro from "../components/AboutIntro.astro";
 import OfficeScene from "../components/OfficeScene.astro";
+import githubSvg from "@tabler/icons/outline/brand-github.svg?raw";
+import mailSvg from "@tabler/icons/outline/mail.svg?raw";
+import linkedinSvg from "@tabler/icons/outline/brand-linkedin.svg?raw";
 
 const socialLabels: Record<string, string> = {
   github: "GitHub",
@@ -12,11 +15,18 @@ const socialLabels: Record<string, string> = {
   bluesky: "Bluesky",
 };
 
+const icons: Record<string, string> = {
+  github: githubSvg,
+  email: mailSvg,
+  linkedin: linkedinSvg,
+};
+
 const socials = Object.entries(site.socials).map(([key, value]) => ({
   key,
+  icon: icons[key]?.replace("<svg", '<svg aria-hidden="true"'),
   label: socialLabels[key] ?? key,
   href: key === "email" ? `mailto:${value}` : value,
-  display: key === "email" ? value : value.replace(/^https?:\/\//, ""),
+  display: key === "email" ? value : value.replace(/^https?:\/\/(www\.)?/, ""),
 }));
 
 // TODO(sathvik): fill in five: a food; a place; a tool or piece of software
@@ -31,8 +41,6 @@ const likes: string[] = [];
   </OfficeScene>
 
   <div class="about-grid">
-    {/* TODO(sathvik): replace with a real portrait and write real alt text */}
-
     <article class="about-content">
       {/* "How I got here" —
           TODO(sathvik): the honest, slightly winding version, not "I've always loved
@@ -54,10 +62,7 @@ const likes: string[] = [];
       )}
 
       <section class="section">
-        <h2>Say hello</h2>
-        <p class="contact-lede">
-          Reachable here, in rough order of how likely I am to reply fast:
-        </p>
+        <h2>Contact me</h2>
         <ul class="contact">
           {socials.map((s) => (
             <li>
@@ -65,6 +70,7 @@ const likes: string[] = [];
                 href={s.href}
                 rel={s.key === "email" ? undefined : "me noopener noreferrer"}
               >
+                {s.icon && <span class="contact-icon" set:html={s.icon} />}
                 {s.label} <span class="contact-value">{s.display}</span>
               </a>
             </li>
@@ -77,41 +83,21 @@ const likes: string[] = [];
 
 <style>
   .about-grid {
-    display: grid;
-    grid-template-columns: var(--rail) minmax(0, 1fr);
-    gap: var(--space-xl);
-    align-items: start;
-    padding-block: var(--space-xl) var(--space-3xl);
-  }
-
-  .portrait {
-    grid-column: 1;
-    position: sticky;
-    top: var(--space-l);
-  }
-
-  .portrait img {
-    width: 100%;
-    aspect-ratio: 4 / 5;
-    object-fit: cover;
-    border-radius: var(--radius);
-    border: 1px solid var(--rule);
+    padding-block: var(--space-l) 0;
   }
 
   .about-content {
-    grid-column: 2;
     max-width: var(--measure);
     min-width: 0;
   }
 
-  /* .portrait is gone until a real portrait exists; without this, .about-content
-     stays pinned to column 2 and leaves a hole where the rail used to be. */
-  .about-grid > :only-child {
-    grid-column: 1 / -1;
-  }
-
   .section {
     margin-bottom: var(--space-xl);
+  }
+
+  /* Footer supplies its own top margin, so no trailing gap here */
+  .section:last-child {
+    margin-bottom: 0;
   }
 
   .section h2 {
@@ -143,11 +129,6 @@ const likes: string[] = [];
     color: var(--accent-ink);
   }
 
-  .contact-lede {
-    color: var(--muted);
-    margin-bottom: var(--space-s);
-  }
-
   .contact {
     list-style: none;
     padding: 0;
@@ -161,28 +142,20 @@ const likes: string[] = [];
     font-size: var(--step--1);
   }
 
+  .contact-icon :global(svg) {
+    width: 1.1em;
+    height: 1.1em;
+    display: inline-block;
+    max-width: none;
+    vertical-align: -0.2em;
+    margin-right: 0.4em;
+  }
+
   .contact-value {
     color: var(--muted);
   }
 
   .contact-value::before {
     content: " · ";
-  }
-
-  @media (max-width: 768px) {
-    .about-grid {
-      grid-template-columns: 1fr;
-      gap: var(--space-l);
-    }
-
-    .portrait {
-      grid-column: 1;
-      position: static;
-      max-width: 16rem;
-    }
-
-    .about-content {
-      grid-column: 1;
-    }
   }
 </style>

@@ -1,0 +1,291 @@
+---
+// Headshot with four icon buttons; each flips the photo to show a card on its back.
+import { Image } from 'astro:assets';
+
+// Optional until the headshot exists: drop it at src/assets/me.{jpg,jpeg,png,webp}.
+const found = Object.values(
+  import.meta.glob<{ default: ImageMetadata }>('../assets/me.{jpg,jpeg,png,webp}', { eager: true }),
+);
+const me = found[0]?.default;
+
+const stroke = 'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"';
+---
+
+<div class="orbit">
+  <div class="orbit__flip">
+   <div class="orbit__inner">
+    <div class="orbit__photo">
+    {/* TODO(sathvik): write real alt text describing the headshot */}
+    {me
+      ? <Image src={me} alt="Portrait of Sathvik Rao" width={608} height={608} widths={[304, 608]} sizes="19rem" />
+      : <span class="orbit__initials" aria-hidden="true">SR</span>}
+    </div>
+    <div class="orbit__back" id="orbit-back" aria-live="polite" aria-hidden="true" inert>
+  {/* TODO(sathvik): replace each placeholder card with your own words. */}
+  <div id="pop-music" class="orbit__card" hidden>
+    <h3>Music</h3>
+    <p>I listen to all genres of music, but rock is the one catching my ear right now.</p>
+  </div>
+  <div id="pop-racket" class="orbit__card" hidden>
+    <h3>Racket sports</h3>
+    {/* TODO(sathvik): which sports, and how good you honestly are */}
+    <p>I'm always up for a game of any racket sport. If you call, I will show up.</p>
+  </div>
+  <div id="pop-academic" class="orbit__card" hidden>
+    <h3>Academic interests</h3>
+    {/* TODO(sathvik): the specific question in distributed systems / ML that hooks you */}
+    <p>Somewhere between machine learning and infrastructure, taking systems apart.</p>
+  </div>
+  <div id="pop-tangents" class="orbit__card" hidden>
+    <h3>Tangents</h3>
+    {/* TODO(sathvik): one real tangent that mattered; link a post once a fitting one exists */}
+    <p>I sit down to understand one thing and stand up three tangents later. I keep going until the fundamentals click.</p>
+  </div>
+    </div>
+   </div>
+  </div>
+
+  <div class="orbit__ring">
+    <div class="orbit__slot" style="--a: 0deg">
+      <button class="orbit__btn" data-card="music" aria-pressed="false" aria-controls="orbit-back" aria-label="Music">
+    <svg viewBox="0 0 24 24" aria-hidden="true" set:html={`<g ${stroke}><rect x="6" y="3" width="12" height="18" rx="2"/><circle cx="12" cy="15" r="3"/><circle cx="12" cy="7.5" r="0.5"/></g>`} />
+  </button>
+    </div>
+    <div class="orbit__slot" style="--a: 90deg">
+      <button class="orbit__btn" data-card="racket" aria-pressed="false" aria-controls="orbit-back" aria-label="Racket sports">
+    <svg viewBox="0 0 24 24" aria-hidden="true" set:html={`<g ${stroke}><ellipse cx="14.5" cy="9.5" rx="5.5" ry="6.5" transform="rotate(45 14.5 9.5)"/><path d="M10.5 13.5 4 20"/><path d="M4 18l2 2"/></g>`} />
+  </button>
+    </div>
+    <div class="orbit__slot" style="--a: 180deg">
+      <button class="orbit__btn" data-card="academic" aria-pressed="false" aria-controls="orbit-back" aria-label="Academic interests">
+    <svg viewBox="0 0 24 24" aria-hidden="true" set:html={`<g ${stroke}><circle cx="5" cy="6" r="1.75"/><circle cx="5" cy="18" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="19" cy="6" r="1.75"/><circle cx="19" cy="18" r="1.75"/><path d="M6.5 7l4 4M6.5 17l4-4M13.5 11l4-4M13.5 13l4 4"/></g>`} />
+  </button>
+    </div>
+    <div class="orbit__slot" style="--a: 270deg">
+      <button class="orbit__btn" data-card="tangents" aria-pressed="false" aria-controls="orbit-back" aria-label="Tangents and fundamentals">
+    <svg viewBox="0 0 24 24" aria-hidden="true" set:html={`<g ${stroke}><circle cx="6" cy="5" r="1.75"/><circle cx="6" cy="19" r="1.75"/><circle cx="18" cy="8" r="1.75"/><path d="M6 6.75v10.5"/><path d="M18 9.75c0 4-6 3-12 6.5"/></g>`} />
+  </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Module scope: attached once, survives ClientRouter swaps (Astro dedupes
+  // module scripts). Delegates from document and looks elements up fresh.
+  function show(face: string | null) {
+    const orbit = document.querySelector<HTMLElement>('.orbit');
+    if (!orbit) return;
+    if (face) orbit.dataset.face = face;
+    else delete orbit.dataset.face;
+    orbit.querySelectorAll<HTMLElement>('.orbit__card').forEach((c) => (c.hidden = c.id !== `pop-${face}`));
+    orbit.querySelectorAll<HTMLElement>('.orbit__btn').forEach((b) =>
+      b.setAttribute('aria-pressed', String(b.dataset.card === face)),
+    );
+    const back = orbit.querySelector<HTMLElement>('.orbit__back');
+    back?.toggleAttribute('inert', !face);
+    back?.setAttribute('aria-hidden', String(!face));
+  }
+
+  document.addEventListener('click', (e) => {
+    const t = e.target as Element;
+    const orbit = document.querySelector<HTMLElement>('.orbit');
+    const btn = t.closest<HTMLElement>('.orbit__btn');
+    if (btn) show(orbit?.dataset.face === btn.dataset.card ? null : btn.dataset.card!);
+    else if (t.closest('.orbit__back') && !t.closest('a')) show(null);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') show(null);
+  });
+</script>
+
+<style>
+  .orbit {
+    --photo: 19rem;
+    --btn: 3.25rem;
+    --r: calc(var(--photo) / 2 + var(--btn) * 0.9); /* ring radius, button centres */
+    --size: calc(2 * var(--r) + var(--btn));
+    position: relative;
+    width: var(--size);
+    max-width: 100%;
+  }
+
+  /* Photo and ring share one square box; the ring spins around the photo.
+     The photo circle is a two-faced coin: photo in front, card behind. */
+  .orbit__flip {
+    position: absolute;
+    top: calc(var(--size) / 2 - var(--photo) / 2);
+    left: calc(var(--size) / 2 - var(--photo) / 2);
+    width: var(--photo);
+    aspect-ratio: 1;
+    perspective: 1200px;
+  }
+
+  .orbit__inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.6s ease;
+  }
+
+  .orbit[data-face] .orbit__inner {
+    transform: rotateY(180deg);
+  }
+
+  .orbit__photo,
+  .orbit__back {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid var(--rule);
+    background: var(--canvas-raised);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .orbit__photo {
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+  }
+
+  .orbit__photo :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .orbit__initials {
+    font-family: var(--font-display);
+    font-size: var(--step-3);
+    color: var(--muted);
+  }
+
+  .orbit__back {
+    transform: rotateY(180deg);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 15%; /* keeps text inside the inscribed square */
+    text-align: center;
+    color: var(--ink);
+    cursor: pointer;
+    pointer-events: auto; /* .scene__reveal is pointer-events: none */
+  }
+
+  .orbit__ring {
+    width: var(--size);
+    aspect-ratio: 1;
+    animation: orbit-spin 40s linear infinite;
+  }
+
+  /* Each slot is pre-rotated to its angle; its button sits at the slot's top
+     edge, so rotating the slot places it on the circle. */
+  .orbit__slot {
+    position: absolute;
+    inset: 0;
+    transform: rotate(var(--a));
+    pointer-events: none;
+  }
+
+  .orbit__btn {
+    position: absolute;
+    top: 0;
+    left: calc(50% - var(--btn) / 2);
+    display: grid;
+    place-items: center;
+    width: var(--btn);
+    height: var(--btn);
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--rule);
+    background: var(--canvas);
+    color: var(--accent-ink);
+    cursor: pointer;
+    pointer-events: auto;
+    /* undo slot angle; the animation also undoes the ring's spin */
+    rotate: calc(var(--a) * -1);
+    animation: orbit-unspin 40s linear infinite;
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+
+  .orbit__btn:hover,
+  .orbit__btn:focus-visible,
+  .orbit__btn[aria-pressed='true'] {
+    background: var(--accent-soft);
+  }
+
+  .orbit__btn[aria-pressed='true'] {
+    border-color: var(--accent-ink);
+  }
+
+  .orbit__btn svg {
+    width: 1.6rem;
+    height: 1.6rem;
+  }
+
+  @keyframes orbit-spin {
+    to { rotate: 360deg; }
+  }
+
+  @keyframes orbit-unspin {
+    from { rotate: calc(var(--a) * -1); }
+    to { rotate: calc(var(--a) * -1 - 360deg); }
+  }
+
+  /* Don't move targets under the cursor / while a card is showing. */
+  .orbit:hover .orbit__ring,
+  .orbit:hover .orbit__btn,
+  .orbit:focus-within .orbit__ring,
+  .orbit:focus-within .orbit__btn,
+  .orbit[data-face] .orbit__ring,
+  .orbit[data-face] .orbit__btn {
+    animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .orbit__ring,
+    .orbit__btn {
+      animation: none;
+    }
+
+    .orbit__inner {
+      transition: none;
+    }
+  }
+
+  .orbit__card h3 {
+    font-size: var(--step-0);
+    margin-bottom: var(--space-3xs);
+  }
+
+  .orbit__card p {
+    font-size: var(--step--1);
+    line-height: 1.5;
+  }
+
+  .orbit__card a {
+    color: var(--accent-ink);
+  }
+
+  @media (max-width: 768px) {
+    .orbit {
+      --photo: 14rem;
+      --btn: 2.75rem;
+      margin-inline: auto;
+    }
+
+    .orbit__card h3 {
+      font-size: var(--step--1);
+      margin-bottom: 0.15rem;
+    }
+
+    .orbit__card p {
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+  }
+</style>

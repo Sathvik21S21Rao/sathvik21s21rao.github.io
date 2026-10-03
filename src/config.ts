@@ -7,19 +7,18 @@ export const site = {
   socials: {
     github: 'https://github.com/sathvik21s21rao',
     email: 'sathvikrao04@gmail.com',
-    // TODO(sathvik): add linkedin / x / bluesky if you want them
+    linkedin: 'https://www.linkedin.com/in/sathvik-s-rao-998292278/',
+    // TODO(sathvik): add x / bluesky if you want them
   },
   nav: [
     { href: '/', label: 'About' },
-    { href: '/now', label: 'Now' },
     { href: '/writing', label: 'Writing' },
-    { href: '/projects', label: 'Projects' },
   ],
-  // Fill these in after the repo exists: see README. Comments stay hidden until repo+repoId+categoryId are all non-empty.
+  // IDs come from the GitHub GraphQL API / giscus.app; the giscus GitHub App must be installed on the repo.
   giscus: {
-    repo: '', // e.g. 'sathvik21s21rao/sathvik21s21rao.github.io'
-    repoId: '',
+    repo: 'Sathvik21S21Rao/sathvik21s21rao.github.io',
+    repoId: 'R_kgDOUs6Syg',
     category: 'Announcements',
-    categoryId: '',
+    categoryId: 'DIC_kwDOUs6Sys4DG5bO',
   },
 } as const;

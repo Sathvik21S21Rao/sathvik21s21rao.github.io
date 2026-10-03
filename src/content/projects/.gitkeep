@@ -1,3 +1,0 @@
-# Keeps the (currently empty) projects collection directory in git, so the CI
-# build sees the same empty collection the local build does rather than a
-# missing one. Templates for real entries: docs/project-templates/.

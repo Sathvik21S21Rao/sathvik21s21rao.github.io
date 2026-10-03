@@ -7,7 +7,6 @@
 import { Image } from 'astro:assets';
 import dayImg from '../assets/scene/office-day.png';
 import nightImg from '../assets/scene/office-night.png';
-import { site } from '../config';
 ---
 
 <section class="scene" data-scene>
@@ -43,7 +42,7 @@ import { site } from '../config';
     <div class="scene__recede" aria-hidden="true"></div>
     <div class="scene__scrim" aria-hidden="true"></div>
     <div class="scene__content">
-      <p class="scene__tagline">{site.description}</p>
+      <p class="scene__tagline">Zoom in to know more about me</p>
     </div>
     <div class="scene__reveal">
       <div class="wrap"><slot /></div>
@@ -641,7 +640,9 @@ import { site } from '../config';
      unlike .scene__tagline above it uses the normal --ink body colour
      rather than the fixed light colour the tagline needs for legibility
      over the dark scrim. Positioned the same way as .scene__content
-     (absolute, inset 0) but centred rather than top-aligned, and
+     (absolute, inset 0) but bottom-anchored rather than top-aligned (this keeps
+     the hand-off to .about-grid a fixed gap regardless of viewport height,
+     where centring split the leftover height above and below), and
      constrained to the site's normal .wrap measure/padding so it lines up
      with the page content below instead of sprawling full-bleed. Fades in
      over --reveal-start -> --reveal-end, once the recede dissolve is most
@@ -653,8 +654,9 @@ import { site } from '../config';
     position: absolute;
     inset: 0;
     display: flex;
-    align-items: center;
-    padding-block: var(--space-2xl);
+    align-items: flex-end;
+    align-items: safe flex-end;
+    padding-block: var(--space-2xl) var(--space-l);
     opacity: clamp(0, (var(--p, 0) - var(--reveal-start)) / (var(--reveal-end) - var(--reveal-start)), 1);
     pointer-events: none;
   }
@@ -663,7 +665,8 @@ import { site } from '../config';
     width: 100%;
   }
 
-  .scene__reveal :global(a) {
+  .scene__reveal :global(a),
+  .scene__reveal :global(button) {
     pointer-events: auto;
   }
 

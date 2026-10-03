@@ -1,5 +1,5 @@
 ---
-// Shared "about me" opening: the hook line plus the "What I work on" blurb.
+// Shared "about me" opening: greeting, bio paragraph and the portrait orbit.
 // Used at h1 on / (the About page).
 interface Props {
   level?: "h1" | "h2";
@@ -7,42 +7,117 @@ interface Props {
 
 const { level = "h1" } = Astro.props;
 const Heading = level;
+import { site } from "../config";
+import PortraitOrbit from "./PortraitOrbit.astro";
 ---
 
-<Heading class="hook">
-  {/* TODO(sathvik): replace with a real opening sentence, a hook, not a resume line. */}
-  I build things, break most of them first, and write down what the breaking
-  taught me.
-</Heading>
-
-{/* TODO(sathvik): "What I work on" — 2-4 sentences on the kind of problems you
-    gravitate toward, specific enough that someone could picture a Tuesday of
-    yours. Not a list of technologies; the shape of the work, not the resume of
-    it. */}
+<div class="intro">
+  <Heading class="greeting">Hey there, I'm {site.name.split(" ")[0]}</Heading>
+  <PortraitOrbit />
+  <p class="bio">
+    I'm a computer science student at IIIT Bangalore. I started this page because I was bored, but really it's a place to share how I understand the things I'm interested in. Some of the topics may sound basic, but that's deliberate: the fundamentals are where I think we need to be strongest. Have a look at <a href="/writing">my writing</a>, and if a topic interests you, hop into the discussion. I'm new to all this, so cut me some slack.
+  </p>
+</div>
 
 <style>
-  .hook {
+  /* Mobile first: one left-aligned column, orbit centred and shrunk to fit short phones */
+  .intro {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-s);
+    text-align: start;
+  }
+
+  .intro :global(.orbit) {
+    --photo: 10rem;
+    align-self: center;
+  }
+
+  .greeting {
     font-size: var(--step-3);
-    line-height: 1.25;
-    margin-bottom: var(--space-2xl);
+    line-height: 1.05;
   }
 
-  .section {
-    margin-bottom: var(--space-xl);
-  }
-
-  .section h2 {
-    font-size: var(--step-1);
-    margin-bottom: var(--space-s);
-  }
-
-  .section p {
+  .bio {
+    font-size: var(--step-0);
     line-height: 1.7;
+    max-width: 52ch;
   }
 
-  @media (max-width: 768px) {
-    .hook {
+  /* Short phones (e.g. 390x667): tighter bio so the reveal is not clipped */
+  @media (max-width: 767px) and (max-height: 700px) {
+    .intro :global(.orbit) {
+      --photo: 6.5rem;
+    }
+
+    .greeting {
       font-size: var(--step-2);
+    }
+
+    .bio {
+      font-size: var(--step--1);
+      line-height: 1.6;
+    }
+  }
+
+  /* Source order stays greeting, orbit, bio (heading semantics); areas place the orbit left */
+  @media (min-width: 768px) {
+    .intro {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      /* Spare height from the taller orbit goes to the greeting row, so the bio
+         ends flush with the block (fixed gap to the content below) */
+      grid-template-rows: 1fr auto;
+      grid-template-areas:
+        "orbit greeting"
+        "orbit bio";
+      column-gap: var(--space-2xl);
+      row-gap: var(--space-s);
+      align-items: center;
+    }
+
+    .greeting {
+      grid-area: greeting;
+      align-self: end;
+      font-size: var(--step-4);
+    }
+
+    .intro :global(.orbit) {
+      grid-area: orbit;
+      --photo: 14rem;
+    }
+
+    .bio {
+      grid-area: bio;
+      align-self: start;
+    }
+  }
+
+  /* Landscape phones: keep two columns but shrink everything to fit the viewport height */
+  @media (min-width: 768px) and (max-height: 500px) {
+    .intro {
+      column-gap: var(--space-l);
+      row-gap: var(--space-2xs);
+    }
+
+    .greeting {
+      font-size: var(--step-2);
+    }
+
+    .intro :global(.orbit) {
+      --photo: 6.5rem;
+    }
+
+    .bio {
+      font-size: var(--step--1);
+      line-height: 1.5;
+    }
+  }
+
+  @media (min-width: 1024px) and (min-height: 501px) {
+    .intro :global(.orbit) {
+      --photo: 19rem;
     }
   }
 </style>
